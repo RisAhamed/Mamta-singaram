@@ -1,0 +1,308 @@
+import { useState } from 'react'
+import {
+  IndianRupee,
+  LayoutDashboard,
+  Menu,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Stethoscope,
+  Users,
+  FileText,
+} from 'lucide-react'
+import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { CLINIC_NAME, CLINIC_SUBTITLE } from '../lib/config'
+import { CONSULTATION_FORMS } from '../lib/consultationForms'
+
+const navigationItems = [
+  { label: 'Dashboard', path: '/', icon: LayoutDashboard, aliases: ['/dashboard'] },
+  { label: 'Patients', path: '/patients', icon: Users },
+  { label: 'Doctors', path: '/doctors', icon: Stethoscope },
+  { label: 'Payments', path: '/payments', icon: IndianRupee },
+]
+
+const prescriptionPads = [
+  { label: 'Dr. Ashok MDS', doctorId: 'ashok' },
+  { label: 'Dr. Mamta', doctorId: 'mamta' },
+]
+
+const routeTitles = [
+  { matcher: /^\/$/, title: 'Dashboard' },
+  { matcher: /^\/dashboard$/, title: 'Dashboard' },
+  { matcher: /^\/patients\/[^/]+\/edit$/, title: 'Edit Patient' },
+  { matcher: /^\/patients\/[^/]+$/, title: 'Patient Detail' },
+  { matcher: /^\/patients$/, title: 'Patients' },
+  { matcher: /^\/doctors$/, title: 'Doctors' },
+  { matcher: /^\/payments$/, title: 'Payments' },
+  { matcher: /^\/search$/, title: 'Search' },
+  { matcher: /^\/sessions\/new$/, title: 'New Session' },
+  { matcher: /^\/sessions\/edit\/[^/]+$/, title: 'Edit Session' },
+]
+
+function AppLayout() {
+  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
+
+  const location = useLocation()
+  const pageTitle =
+    routeTitles.find((route) => route.matcher.test(location.pathname))?.title ||
+    CLINIC_NAME
+
+  const closeMobileSidebar = () => setMobileSidebarOpen(false)
+
+  return (
+    <div className="h-screen overflow-hidden bg-slate-50 text-slate-950">
+      <aside
+        className={`fixed inset-y-0 left-0 z-40 hidden flex-col bg-slate-950 text-white transition-all duration-300 ease-in-out md:flex ${
+          sidebarOpen ? 'w-60' : 'w-16'
+        }`}
+      >
+        <SidebarContent
+          expanded={sidebarOpen}
+          onNavigate={closeMobileSidebar}
+          onToggle={() => setSidebarOpen((current) => !current)}
+          currentPath={location.pathname}
+          consultationForms={CONSULTATION_FORMS}
+        />
+      </aside>
+
+      <div
+        className={`fixed inset-0 z-50 md:hidden ${
+          mobileSidebarOpen ? 'pointer-events-auto' : 'pointer-events-none'
+        }`}
+        aria-hidden={!mobileSidebarOpen}
+      >
+        <button
+          type="button"
+          className={`absolute inset-0 bg-slate-950/60 transition-opacity duration-200 ${
+            mobileSidebarOpen ? 'opacity-100' : 'opacity-0'
+          }`}
+          onClick={closeMobileSidebar}
+          aria-label="Close sidebar backdrop"
+        />
+        <aside
+          className={`absolute inset-y-0 left-0 flex w-60 flex-col bg-slate-950 text-white shadow-2xl transition-transform duration-200 ease-out ${
+            mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'
+          }`}
+        >
+          <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
+            <Logo expanded />
+            <button
+              type="button"
+              onClick={closeMobileSidebar}
+              className="rounded-md p-2 text-slate-300 transition hover:bg-white/10 hover:text-white focus:outline-none focus:ring-2 focus:ring-teal-400"
+              aria-label="Close sidebar"
+            >
+              <PanelLeftClose className="h-5 w-5" />
+            </button>
+          </div>
+          <SidebarNav
+            onNavigate={closeMobileSidebar}
+            expanded
+            currentPath={location.pathname}
+            consultationForms={CONSULTATION_FORMS}
+          />
+        </aside>
+      </div>
+
+      <div
+        className={`transition-all duration-300 ease-in-out ${
+          sidebarOpen ? 'md:pl-60' : 'md:pl-16'
+        }`}
+      >
+        <header
+          className={`fixed left-0 right-0 top-0 z-30 grid h-16 grid-cols-[2.5rem_1fr_2.5rem] items-center border-b border-slate-200 bg-white px-4 shadow-sm transition-all duration-300 ease-in-out md:flex md:justify-between md:px-6 ${
+            sidebarOpen ? 'md:left-60' : 'md:left-16'
+          }`}
+        >
+          <div className="flex items-center gap-3 md:w-full">
+            <button
+              type="button"
+              onClick={() => setMobileSidebarOpen(true)}
+              className="rounded-md p-2 text-slate-600 transition hover:bg-slate-100 hover:text-slate-950 focus:outline-none focus:ring-2 focus:ring-teal-500 md:hidden"
+              aria-label="Open sidebar"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+            <h1 className={`absolute left-1/2 -translate-x-1/2 font-semibold tracking-normal text-slate-950 md:static md:translate-x-0 md:ml-8 transition-all ${
+              pageTitle.length > 25
+                ? 'text-xs md:text-sm'
+                : pageTitle.length > 15
+                  ? 'text-sm md:text-base'
+                  : 'text-base md:text-lg'
+            }`}>
+              {pageTitle}
+            </h1>
+          </div>
+          <div className="hidden md:block" />
+        </header>
+
+        <main className="h-screen overflow-y-auto pt-16">
+          <div className="p-4 sm:p-6">
+            <Outlet />
+          </div>
+        </main>
+      </div>
+    </div>
+  )
+}
+
+function SidebarContent({ expanded, onNavigate, onToggle, currentPath, consultationForms }) {
+  const ToggleIcon = expanded ? PanelLeftClose : PanelLeftOpen
+
+  return (
+    <>
+      <div
+        className={`flex border-b border-white/10 px-3 ${
+          expanded
+            ? 'min-h-[4rem] py-2 items-center justify-between gap-1.5'
+            : 'h-20 flex-col items-center justify-center gap-2'
+        }`}
+      >
+        <Logo expanded={expanded} />
+        <button
+          type="button"
+          onClick={onToggle}
+          className="rounded-md p-2 text-slate-300 transition hover:bg-white/10 hover:text-white focus:outline-none focus:ring-2 focus:ring-teal-400"
+          aria-label={expanded ? 'Collapse sidebar' : 'Expand sidebar'}
+        >
+          <ToggleIcon className="h-5 w-5" />
+        </button>
+      </div>
+      <SidebarNav
+        onNavigate={onNavigate}
+        expanded={expanded}
+        currentPath={currentPath}
+        consultationForms={consultationForms}
+      />
+    </>
+  )
+}
+
+function Logo({ expanded = false }) {
+  if (expanded) {
+    const nameLength = CLINIC_NAME.length
+    // Dynamic text size based on clinic name length to prevent clipping or layout breakages
+    let fontSizeClass = 'text-lg'
+    if (nameLength > 25) {
+      fontSizeClass = 'text-xs'
+    } else if (nameLength > 15) {
+      fontSizeClass = 'text-sm'
+    }
+
+    return (
+      <div className="min-w-0 flex-1 pr-1">
+        <div className={`font-bold tracking-normal leading-tight break-words ${fontSizeClass}`} title={CLINIC_NAME}>
+          🦷 {CLINIC_NAME}
+        </div>
+        <div className="mt-0.5 text-[10px] sm:text-xs font-medium text-slate-400 truncate" title={CLINIC_SUBTITLE}>
+          {CLINIC_SUBTITLE}
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="text-lg font-bold tracking-normal" aria-label={CLINIC_NAME}>
+      <span>
+        🦷
+      </span>
+    </div>
+  )
+}
+
+function SidebarNav({ onNavigate, expanded = false, currentPath = '', consultationForms = [] }) {
+  return (
+      <nav className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain px-2 py-4 [touch-action:pan-y]">
+      <div className="space-y-1">
+        {navigationItems.map((item) => {
+          const Icon = item.icon
+
+          return (
+            <NavLink
+              key={item.path}
+              to={item.path}
+              end={item.path === '/'}
+              onClick={onNavigate}
+              aria-label={item.label}
+              className={({ isActive }) => {
+                const isAliasActive = item.aliases?.includes(currentPath)
+                return `group relative flex items-center rounded-md px-3 py-2.5 text-sm font-medium transition ${
+                  expanded ? 'justify-start gap-3' : 'justify-center'
+                } ${
+                  isActive || isAliasActive
+                    ? 'bg-teal-600 text-white shadow-sm'
+                    : 'text-slate-300 hover:bg-white/10 hover:text-white'
+                }`
+              }}
+            >
+              <Icon className="h-5 w-5 shrink-0" />
+              <span className={expanded ? 'block' : 'hidden'}>{item.label}</span>
+              {!expanded && (
+                <span className="pointer-events-none absolute left-full top-1/2 z-50 ml-3 hidden -translate-y-1/2 whitespace-nowrap rounded-md bg-slate-900 px-2.5 py-1.5 text-xs font-medium text-white opacity-0 shadow-lg transition group-hover:opacity-100 md:block">
+                  {item.label}
+                </span>
+              )}
+            </NavLink>
+          )
+        })}
+      </div>
+
+      <div className="mt-4 border-t border-white/5 pt-4">
+        <div className={`mb-2 px-2 text-xs font-semibold uppercase text-slate-400 ${expanded ? 'block' : 'hidden'}`}>
+          Consultation forms
+        </div>
+        <div className="space-y-1 px-1">
+          {consultationForms.map((form) => (
+            <a
+              key={form.file}
+              href={form.file}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => onNavigate()}
+              aria-label={form.label}
+              className={`group relative flex w-full items-center rounded-md px-3 py-2 text-sm font-medium transition ${expanded ? 'justify-start gap-3' : 'justify-center'} text-slate-300 hover:bg-white/10 hover:text-white`}
+            >
+              <FileText className="h-5 w-5 shrink-0" />
+              <span className={expanded ? 'inline' : 'hidden'}>{form.label}</span>
+              {!expanded && (
+                <span className="pointer-events-none absolute left-full top-1/2 z-50 ml-3 hidden -translate-y-1/2 whitespace-nowrap rounded-md bg-slate-900 px-2.5 py-1.5 text-xs font-medium text-white opacity-0 shadow-lg transition group-hover:opacity-100 md:block">
+                  {form.label}
+                </span>
+              )}
+            </a>
+          ))}
+        </div>
+
+      </div>
+
+      <div className="mt-4 border-t border-white/5 pt-4">
+        <div className={`mb-2 px-2 text-xs font-semibold uppercase text-slate-400 ${expanded ? 'block' : 'hidden'}`}>
+          Prescription pads
+        </div>
+        <div className="space-y-1 px-1">
+          {prescriptionPads.map((pad) => (
+            <a
+              key={pad.doctorId}
+              href={`/prescription/${pad.doctorId}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => onNavigate()}
+              aria-label={pad.label}
+              className={`group relative flex w-full items-center rounded-md px-3 py-2 text-sm font-medium transition ${expanded ? 'justify-start gap-3' : 'justify-center'} text-slate-300 hover:bg-white/10 hover:text-white`}
+            >
+              <FileText className="h-5 w-5 shrink-0" />
+              <span className={expanded ? 'inline' : 'hidden'}>{pad.label}</span>
+              {!expanded && (
+                <span className="pointer-events-none absolute left-full top-1/2 z-50 ml-3 hidden -translate-y-1/2 whitespace-nowrap rounded-md bg-slate-900 px-2.5 py-1.5 text-xs font-medium text-white opacity-0 shadow-lg transition group-hover:opacity-100 md:block">
+                  {pad.label}
+                </span>
+              )}
+            </a>
+          ))}
+        </div>
+      </div>
+    </nav>
+  )
+}
+
+export default AppLayout

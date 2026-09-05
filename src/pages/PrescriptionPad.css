@@ -1,0 +1,470 @@
+.prescription-pad-page {
+    --primary: #01696f;
+    --primary-light: #018a91;
+    --accent: #f0f9fa;
+    --text-main: #1a1a1a;
+    --text-muted: #4a5568;
+    --border-color: rgba(0,0,0,0.15);
+    --bg-shell: #f4f7f8;
+    --bg-bill: #ffffff;
+    --danger: #c0392b;
+
+    font-family: 'Inter', system-ui, sans-serif;
+    background-color: var(--bg-shell);
+    color: var(--text-main);
+    line-height: 1.5;
+    min-height: 100vh;
+}
+
+.prescription-pad-page * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+/* ==================== TOOLBAR ==================== */
+.prescription-pad-page .toolbar {
+    position: sticky;
+    top: 0;
+    background: white;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    padding: 12px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    z-index: 100;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+.prescription-pad-page .toolbar-brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'Playfair Display', serif;
+    font-weight: 700;
+    font-size: 1.15rem;
+    color: var(--primary);
+}
+.prescription-pad-page .toolbar-brand svg { width: 22px; height: 22px; fill: var(--primary); }
+.prescription-pad-page .action-buttons { display: flex; gap: 10px; flex-wrap: wrap; }
+
+.prescription-pad-page button {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 6px;
+    font-family: 'Inter', sans-serif;
+    font-weight: 500;
+    font-size: 0.85rem;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s ease;
+}
+.prescription-pad-page .btn-primary { background: var(--primary); color: white; }
+.prescription-pad-page .btn-primary:hover { background: var(--primary-light); }
+.prescription-pad-page .btn-secondary { background: white; color: var(--primary); border: 1px solid var(--primary); }
+.prescription-pad-page .btn-secondary:hover { background: var(--accent); }
+.prescription-pad-page .btn-danger { background: white; color: var(--danger); border: 1px solid var(--danger); }
+.prescription-pad-page .btn-danger:hover { background: #fdf2f2; }
+
+/* ==================== APP SHELL ==================== */
+.prescription-pad-page .app-shell {
+    padding: 30px 16px;
+    display: flex;
+    justify-content: center;
+}
+
+/* ==================== BILL ==================== */
+.prescription-pad-page .bill-container {
+    background: var(--bg-bill);
+    width: 794px;
+    height: 1123px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+    border-radius: 4px;
+    padding: 36px 44px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* Header */
+.prescription-pad-page .bill-header { text-align: center; margin-bottom: 12px; }
+.prescription-pad-page .clinic-name {
+    font-family: 'Playfair Display', serif;
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--primary);
+    margin-bottom: 10px;
+    line-height: 1.15;
+}
+.prescription-pad-page .header-details {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+.prescription-pad-page .header-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+.prescription-pad-page .clinic-logo {
+    width: 90px;
+    height: 90px;
+    object-fit: contain;
+}
+.prescription-pad-page .doctor-info { text-align: left; }
+.prescription-pad-page .doctor-name { font-weight: 700; font-size: 1.05rem; margin-bottom: 1px; }
+.prescription-pad-page .doctor-title { font-size: 0.85rem; color: var(--text-muted); }
+
+.prescription-pad-page .header-right { text-align: right; }
+.prescription-pad-page .contact-info { font-size: 0.9rem; font-weight: 600; margin-bottom: 2px; }
+.prescription-pad-page .consulting-hours { font-size: 0.78rem; color: var(--text-muted); line-height: 1.35; }
+.prescription-pad-page .appointment-label {
+    display: inline-block;
+    background: var(--primary);
+    color: white;
+    padding: 2px 10px;
+    border-radius: 10px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    margin-top: 4px;
+}
+
+.prescription-pad-page .bill-divider {
+    border: none;
+    border-top: 2px solid var(--primary);
+    margin: 12px 0;
+    opacity: 0.5;
+}
+.prescription-pad-page .services-strip {
+  text-align: center;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #01696f;
+  padding: 6px 16px;
+  line-height: 1.7;
+  width: 100%;
+  box-sizing: border-box;
+  word-break: keep-all;
+  overflow-wrap: normal;
+  white-space: normal;
+}
+
+.prescription-pad-page .bill-header,
+.prescription-pad-page .services-strip-container {
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.prescription-pad-page .address-line {
+    text-align: center;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-bottom: 20px;
+}
+
+/* Form area */
+.prescription-pad-page .bill-form {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+}
+
+.prescription-pad-page .bill-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 18px;
+    font-weight: 600;
+    font-size: 0.95rem;
+}
+
+.prescription-pad-page .input-inline {
+    border: none;
+    border-bottom: 1px dashed var(--border-color);
+    background: transparent;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.95rem;
+    color: var(--text-main);
+    padding: 2px 4px;
+    outline: none;
+    transition: border-color 0.2s;
+}
+.prescription-pad-page .input-inline:focus {
+    border-bottom-color: var(--primary);
+    background: var(--accent);
+}
+.prescription-pad-page .input-inline::placeholder { color: #cbd5e0; font-weight: 400; }
+
+.prescription-pad-page .bill-no-input { width: 100px; }
+.prescription-pad-page .date-input { width: 140px; font-family: 'Inter', sans-serif; }
+
+.prescription-pad-page .patient-info {
+  display: block;
+  line-height: 1.9;
+  white-space: normal;
+  margin-bottom: 20px;
+  font-size: 0.95rem;
+}
+
+.prescription-pad-page .patient-info input {
+  display: inline-block;
+  vertical-align: baseline;
+}
+
+.prescription-pad-page .patient-name-input {
+  width: auto;
+  min-width: 80px;
+  display: inline-block;
+  box-sizing: content-box;
+  font-weight: 500;
+}
+.prescription-pad-page .age-input { width: 50px; text-align: center; }
+
+.prescription-pad-page .procedures-section { margin-bottom: 20px; }
+.prescription-pad-page .procedure-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 10px;
+}
+.prescription-pad-page .procedure-left {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    flex: 1;
+    min-width: 0;
+}
+.prescription-pad-page .procedure-left span { flex-shrink: 0; font-weight: 500; padding-top: 3px; }
+.prescription-pad-page .proc-number {
+    visibility: hidden;
+    width: 20px;
+    flex-shrink: 0;
+    padding-top: 3px;
+}
+.prescription-pad-page .procedure-name-input {
+    flex: 1;
+    min-width: 0;
+    resize: none;
+    overflow: hidden;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-word;
+    overflow-wrap: break-word;
+    display: block;
+    width: 100%;
+    min-height: 1.5em;
+}
+.prescription-pad-page .procedure-right {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    flex-shrink: 0;
+    margin-left: 12px;
+    padding-top: 3px;
+}
+.prescription-pad-page .procedure-right label { font-weight: 500; flex-shrink: 0; }
+.prescription-pad-page .procedure-date-input { width: 120px; }
+
+.prescription-pad-page .amount-section {
+    line-height: 2;
+    font-size: 0.95rem;
+    flex-shrink: 0;
+}
+.prescription-pad-page .amount-input {
+    width: 120px;
+    font-weight: 600;
+    text-align: right;
+}
+
+.prescription-pad-page .bill-spacer {
+    flex: 1;
+    flex-shrink: 0;
+    min-height: 20px;
+}
+
+.prescription-pad-page .signatures-section {
+    display: flex;
+    justify-content: space-between;
+    padding-top: 20px;
+    flex-shrink: 0;
+}
+.prescription-pad-page .signature-box { text-align: center; }
+.prescription-pad-page .signature-line {
+    width: 180px;
+    border-top: 1px solid var(--text-main);
+    margin-bottom: 6px;
+}
+.prescription-pad-page .signature-label { font-weight: 600; font-size: 0.9rem; }
+
+.prescription-pad-page #patientName,
+.prescription-pad-page #patientAge,
+.prescription-pad-page #amount {
+    border-bottom: 1px solid #000000;
+}
+
+/* ==================== PRINT ==================== */
+@media print {
+    @page {
+        size: A4 portrait;
+        margin: 10mm 15mm;
+    }
+
+    html, body {
+        width: 210mm;
+        height: 297mm;
+        background: white !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+        overflow: hidden;
+    }
+
+    .prescription-pad-page {
+        background: white !important;
+        min-height: unset !important;
+    }
+
+    .prescription-pad-page .toolbar {
+        display: none !important;
+    }
+
+    .prescription-pad-page .app-shell {
+        padding: 0 !important;
+        display: block !important;
+        background: white !important;
+    }
+
+    .prescription-pad-page .bill-container {
+        width: 180mm !important;
+        height: 277mm !important;
+        max-width: none !important;
+        min-height: unset !important;
+        box-shadow: none !important;
+        border-radius: 0 !important;
+        padding: 8mm 10mm !important;
+        margin: 0 !important;
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+        overflow: hidden !important;
+        display: flex !important;
+        flex-direction: column !important;
+        font-size: 11pt !important;
+    }
+
+    .prescription-pad-page .clinic-name {
+        font-size: 22pt !important;
+    }
+    .prescription-pad-page .doctor-name { font-size: 11pt !important; }
+    .prescription-pad-page .doctor-title { font-size: 9.5pt !important; }
+    .prescription-pad-page .contact-info { font-size: 10pt !important; }
+    .prescription-pad-page .consulting-hours { font-size: 8.5pt !important; }
+    .prescription-pad-page .appointment-label { font-size: 8pt !important; }
+    .prescription-pad-page .services-strip { font-size: 8pt !important; line-height: 1.4 !important; }
+    .prescription-pad-page .address-line { font-size: 9pt !important; margin-bottom: 8px !important; }
+    .prescription-pad-page .patient-info { font-size: 11pt !important; }
+    .prescription-pad-page .signature-label { font-size: 10pt !important; }
+
+    .prescription-pad-page .bill-form {
+        display: flex !important;
+        flex-direction: column !important;
+        flex: 1 !important;
+        min-height: 0 !important;
+        overflow: hidden !important;
+    }
+
+    .prescription-pad-page .bill-spacer {
+        flex: 1 !important;
+        min-height: 0 !important;
+        flex-shrink: 1 !important;
+    }
+
+    .prescription-pad-page .header-details {
+        display: flex !important;
+        flex-direction: row !important;
+        justify-content: space-between !important;
+    }
+    .prescription-pad-page .header-left {
+        display: flex !important;
+        flex-direction: row !important;
+        align-items: center !important;
+    }
+    .prescription-pad-page .header-right { text-align: right !important; }
+
+    .prescription-pad-page .procedure-row {
+        display: flex !important;
+        flex-direction: row !important;
+        justify-content: space-between !important;
+        align-items: flex-start !important;
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+        font-size: 11pt !important;
+    }
+    .prescription-pad-page .bill-meta {
+        display: flex !important;
+        flex-direction: row !important;
+        justify-content: space-between !important;
+        font-size: 11pt !important;
+    }
+    .prescription-pad-page .amount-section {
+        margin-top: 0 !important;
+        padding-top: 4mm !important;
+        font-size: 11pt !important;
+        flex-shrink: 0 !important;
+    }
+    .prescription-pad-page .signatures-section {
+        display: flex !important;
+        flex-direction: row !important;
+        justify-content: space-between !important;
+        margin-top: 6mm !important;
+        padding-top: 0 !important;
+        flex-shrink: 0 !important;
+    }
+    .prescription-pad-page .input-inline {
+        border: none !important;
+        border-bottom: 1px solid transparent !important;
+        background: transparent !important;
+        -webkit-appearance: none;
+        appearance: none;
+        font-size: 11pt !important;
+    }
+    .prescription-pad-page .bill-divider { margin: 8px 0 !important; }
+    .prescription-pad-page .procedure-row.row-empty {
+        display: none !important;
+        visibility: hidden !important;
+        height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        overflow: hidden !important;
+    }
+    .prescription-pad-page #patientName,
+    .prescription-pad-page #patientAge,
+    .prescription-pad-page #amount {
+        border-bottom: 1px solid #000000 !important;
+    }
+}
+
+/* ==================== RESPONSIVE ==================== */
+@media screen and (max-width: 820px) {
+    .prescription-pad-page .bill-container {
+        width: 100%;
+        height: auto;
+        min-height: 100vh;
+        padding: 20px 16px;
+        border-radius: 0;
+    }
+    .prescription-pad-page .app-shell { padding: 10px 0; }
+    .prescription-pad-page .clinic-name { font-size: 1.6rem; }
+    .prescription-pad-page .header-details { flex-direction: column; align-items: center; gap: 12px; text-align: center; }
+    .prescription-pad-page .header-left { flex-direction: column; text-align: center; }
+    .prescription-pad-page .header-right { text-align: center; }
+    .prescription-pad-page .doctor-info { text-align: center; }
+    .prescription-pad-page .procedure-row { flex-wrap: wrap; white-space: normal; }
+    .prescription-pad-page .procedure-right { margin-left: 20px; }
+    .prescription-pad-page .signatures-section { flex-direction: column; gap: 30px; align-items: center; }
+    .prescription-pad-page .toolbar { flex-direction: column; align-items: stretch; }
+    .prescription-pad-page .action-buttons { justify-content: center; }
+}

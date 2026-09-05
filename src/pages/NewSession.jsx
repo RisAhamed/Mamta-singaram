@@ -1,0 +1,1296 @@
+import { useEffect, useRef, useState } from 'react'
+import { format } from 'date-fns'
+import {
+  Check,
+  ChevronDown,
+  Eye,
+  FileText,
+  Loader2,
+  Paperclip,
+  Plus,
+  Save,
+  Syringe,
+  X,
+} from 'lucide-react'
+import { useNavigate, useParams } from 'react-router-dom'
+import { useToast } from '../hooks/useToast'
+import { uploadSessionFile, validateSessionFile, formatFileSize } from '../lib/sessionFiles'
+import { CONSULTATION_FORMS } from '../lib/consultationForms'
+import { saveConsultationFormRecord } from '../lib/consultationFormRecords'
+import { db } from '../lib/firebase'
+import {
+  addDoc,
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  query,
+  serverTimestamp,
+  where,
+} from 'firebase/firestore'
+
+
+const today = format(new Date(), 'yyyy-MM-dd')
+
+
+const initialForm = {
+  visit_date: today,
+  visit_type: 'New',
+  followup_of: '',
+  chief_complaint: '',
+  diagnosis: '',
+  treatment_given: '',
+  injection_given: false,
+  injection_details: '',
+  treatment_cost: '',
+  amount_paid: '',
+  notes: '',
+  next_visit_date: '',
+}
+
+
+const initialChartForm = {
+  region: 'Upper Jaw',
+  tooth_number: '',
+  procedure_done: '',
+  notes: '',
+}
+
+
+const visitTypes = [
+  { label: 'New Problem', value: 'New' },
+  { label: 'Follow-up', value: 'Follow-up' },
+  { label: 'Emergency', value: 'Emergency' },
+  { label: 'Routine Checkup', value: 'Routine Checkup' },
+]
+
+
+const regionOptions = [
+  'Upper Jaw',
+  'Lower Jaw',
+  'Left Cheek',
+  'Right Cheek',
+  'Palate',
+  'Gums',
+  'Tongue',
+  'Other',
+]
+
+
+function NewSession() {
+  const navigate = useNavigate()
+  const { patientId } = useParams()
+  const { showToast } = useToast()
+  const chartEntriesRef = useRef([])
+
+  const [patient, setPatient] = useState(null)
+  const [doctors, setDoctors] = useState([])
+  const [previousSessions, setPreviousSessions] = useState([])
+  const [selectedDoctorIds, setSelectedDoctorIds] = useState([])
+  const [chartEntries, setChartEntries] = useState([])
+  const [chartForm, setChartForm] = useState(initialChartForm)
+  const [formData, setFormData] = useState(initialForm)
+  const [paymentStatus, setPaymentStatus] = useState('Pending')
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [createdSessionId, setCreatedSessionId] = useState(null)
+
+  const [pendingFiles, setPendingFiles] = useState([])
+  const [fileErrors, setFileErrors] = useState([])
+  const [uploadingFile, setUploadingFile] = useState(false)
+
+  const [age, setAge] = useState('')
+  const [weight, setWeight] = useState('')
+  const [bloodPressure, setBloodPressure] = useState('')
+  const [bloodSugar, setBloodSugar] = useState('')
+  const [pulseRate, setPulseRate] = useState('')
+  const [spo2, setSpo2] = useState('')
+
+  // ── Consultation Forms state ──
+  const [pendingConsultationForms, setPendingConsultationForms] = useState([])
+  const [consultationModalForm, setConsultationModalForm] = useState(null)
+  const [modalHasRead, setModalHasRead] = useState(false)
+
+  // Modal action handlers (prevent implicit form submit when nested inside the main form)
+  const handleModalCancel = (event) => {
+    if (event && event.preventDefault) event.preventDefault()
+    if (event && event.stopPropagation) event.stopPropagation()
+    setConsultationModalForm(null)
+  }
+
+  const handleConfirmAttach = (event) => {
+    if (event && event.preventDefault) event.preventDefault()
+    if (event && event.stopPropagation) event.stopPropagation()
+
+    if (!modalHasRead) return
+
+    setPendingConsultationForms((prev) => [
+      ...prev,
+      {
+        formId: consultationModalForm.id,
+        formLabel: consultationModalForm.label,
+      },
+    ])
+    setConsultationModalForm(null)
+  }
+
+
+  useEffect(() => {
+    const cost = Number.parseFloat(formData.treatment_cost) || 0
+    const paid = Number.parseFloat(formData.amount_paid) || 0
+
+    let nextStatus = 'Partial'
+    if (cost === 0) {
+      nextStatus = 'Paid'
+    } else if (paid <= 0) {
+      nextStatus = 'Pending'
+    } else if (paid >= cost) {
+      nextStatus = 'Paid'
+    }
+
+    const timer = window.setTimeout(() => setPaymentStatus(nextStatus), 0)
+    return () => window.clearTimeout(timer)
+  }, [formData.amount_paid, formData.treatment_cost])
+
+
+  useEffect(() => {
+    const loadPatient = async () => {
+      if (!patientId) {
+        showToast('Missing patientId in the URL.', 'error')
+        setLoading(false)
+        return
+      }
+
+      setLoading(true)
+
+      try {
+        const snap = await getDoc(doc(db, 'patients', patientId))
+
+        if (snap.exists()) {
+          setPatient({ id: snap.id, ...snap.data() })
+        } else {
+          setPatient(null)
+          console.error('No patient found for ID:', patientId)
+        }
+      } catch (error) {
+        console.error('Patient load error:', error)
+        showToast(error.message || 'Unable to load patient.', 'error')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    Promise.resolve().then(loadPatient)
+  }, [patientId, showToast])
+
+
+  useEffect(() => {
+    const loadDoctors = async () => {
+      try {
+        const snap = await getDocs(
+          query(collection(db, 'doctors'), where('is_active', '==', true)),
+        )
+        setDoctors(snap.docs.map((doctorDoc) => ({ id: doctorDoc.id, ...doctorDoc.data() })))
+      } catch (error) {
+        console.error('Doctors load error:', error)
+        showToast(error.message || 'Unable to load doctors.', 'error')
+      }
+    }
+
+    Promise.resolve().then(loadDoctors)
+  }, [showToast])
+
+
+  useEffect(() => {
+    const loadPreviousSessions = async () => {
+      if (!patientId) return
+
+      try {
+        const snap = await getDocs(
+          query(collection(db, 'sessions'), where('patient_id', '==', patientId)),
+        )
+        const rows = snap.docs.map((sessionDoc) => ({
+          id: sessionDoc.id,
+          ...sessionDoc.data(),
+        }))
+        setPreviousSessions(
+          rows.sort((a, b) => toMillis(b.visit_date) - toMillis(a.visit_date)),
+        )
+      } catch (error) {
+        console.error('Previous sessions load error:', error)
+        showToast(error.message || 'Unable to load previous sessions.', 'error')
+      }
+    }
+
+    Promise.resolve().then(loadPreviousSessions)
+  }, [patientId, showToast])
+
+
+  useEffect(() => {
+    chartEntriesRef.current = chartEntries
+  }, [chartEntries])
+
+
+  const handleFormChange = (event) => {
+    const { name, type, checked, value } = event.target
+
+    setFormData((current) => ({
+      ...current,
+      [name]: type === 'checkbox' ? checked : value,
+      ...(name === 'visit_type' && value !== 'Follow-up' ? { followup_of: '' } : {}),
+    }))
+  }
+
+
+  const handleChartDraftChange = (event) => {
+    const { name, value } = event.target
+    setChartForm((current) => ({ ...current, [name]: value }))
+  }
+
+
+  const addChartEntry = () => {
+    if (!chartForm.procedure_done.trim()) {
+      showToast('Procedure Done is required to add an entry.', 'warning')
+      return
+    }
+
+    const entry = {
+      tempId: Date.now(),
+      region: chartForm.region,
+      tooth_number: chartForm.tooth_number.trim() || null,
+      procedure_done: chartForm.procedure_done.trim(),
+      notes: chartForm.notes.trim() || null,
+    }
+
+    setChartEntries((current) => {
+      const updated = [...current, entry]
+      chartEntriesRef.current = updated
+      return updated
+    })
+    setChartForm(initialChartForm)
+  }
+
+
+  const removeChartEntry = (tempId) => {
+    setChartEntries((current) => {
+      const updated = current.filter((entry) => entry.tempId !== tempId)
+      chartEntriesRef.current = updated
+      return updated
+    })
+  }
+
+
+  const toggleDoctor = (doctorId) => {
+    setSelectedDoctorIds((current) =>
+      current.includes(doctorId)
+        ? current.filter((id) => id !== doctorId)
+        : [...current, doctorId],
+    )
+  }
+
+
+  const handleFilesSelected = (event) => {
+    const incomingFiles = Array.from(event.target.files || [])
+    if (!incomingFiles.length) return
+
+    const nextValid = []
+    const nextErrors = []
+
+    incomingFiles.forEach((file) => {
+      // Check for duplicate in pendingFiles
+      const isDuplicate = pendingFiles.some(
+        (item) => item.name === file.name && item.size === file.size && item.type === file.type
+      )
+      if (isDuplicate) {
+        nextErrors.push(`${file.name}: already added`)
+        return
+      }
+
+      const result = validateSessionFile(file)
+      if (result.valid) {
+        nextValid.push({
+          id: `${file.name}-${file.size}-${Date.now()}-${Math.random()}`,
+          file,
+          name: file.name,
+          size: file.size,
+          type: file.type,
+        })
+      } else {
+        nextErrors.push(`${file.name}: ${result.message}`)
+      }
+    })
+
+    if (nextValid.length > 0) {
+      setPendingFiles((prev) => [...prev, ...nextValid])
+    }
+
+    if (nextErrors.length > 0) {
+      setFileErrors(nextErrors)
+    } else {
+      setFileErrors([])
+    }
+
+    event.target.value = ''
+  }
+
+  const removePendingFile = (fileId) => {
+    setPendingFiles((prev) => prev.filter((item) => item.id !== fileId))
+  }
+
+
+  const handleSave = async (event) => {
+    event.preventDefault()
+    if (saving) return
+    const entriesToSave = [...chartEntries]
+    const doctorsToSave = [...selectedDoctorIds]
+
+    if (!formData.chief_complaint.trim()) {
+      showToast('Chief Complaint is required.', 'warning')
+      return
+    }
+
+    setSaving(true)
+
+    try {
+      const currentPatientId = patientId
+      let targetSessionId = createdSessionId
+
+      // Create the session only once. If uploads fail, user can retry without duplicating the session.
+      if (!targetSessionId) {
+        const sessionRef = await addDoc(collection(db, 'sessions'), {
+          patient_id: currentPatientId,
+          visit_date: formData.visit_date,
+          visit_type: formData.visit_type,
+          followup_of:
+            formData.visit_type === 'Follow-up' && formData.followup_of
+              ? formData.followup_of
+              : null,
+          chief_complaint: formData.chief_complaint.trim(),
+          diagnosis: formData.diagnosis.trim(),
+          treatment_given: formData.treatment_given.trim(),
+          injection_given: formData.injection_given,
+          injection_details: formData.injection_given
+            ? formData.injection_details.trim()
+            : '',
+          treatment_cost:
+            Math.round((Number.parseFloat(formData.treatment_cost) || 0) * 100) / 100 || 0,
+          amount_paid:
+            Math.round((Number.parseFloat(formData.amount_paid) || 0) * 100) / 100 || 0,
+          payment_status: paymentStatus,
+          notes: formData.notes.trim(),
+          next_visit_date: formData.next_visit_date || null,
+          vitals: {
+            age: age ? parseInt(age) : null,
+            weight: weight ? parseFloat(weight) : null,
+            blood_pressure: bloodPressure.trim() || null,
+            blood_sugar: bloodSugar ? parseFloat(bloodSugar) : null,
+            pulse_rate: pulseRate ? parseInt(pulseRate) : null,
+            spo2: spo2 ? parseInt(spo2) : null,
+          },
+          created_at: serverTimestamp(),
+          updated_at: serverTimestamp(),
+        })
+
+        targetSessionId = sessionRef.id
+        setCreatedSessionId(targetSessionId)
+
+        if (entriesToSave.length > 0) {
+          for (const entry of entriesToSave) {
+            await addDoc(collection(db, 'dental_chart_entries'), {
+              session_id: targetSessionId,
+              patient_id: currentPatientId,
+              region: entry.region,
+              tooth_number: entry.tooth_number || null,
+              procedure_done: entry.procedure_done,
+              notes: entry.notes || null,
+              created_at: serverTimestamp(),
+            })
+          }
+        }
+
+        if (doctorsToSave.length > 0) {
+          await Promise.all(
+            doctorsToSave.map((doctorId) =>
+              addDoc(collection(db, 'session_doctors'), {
+                session_id: targetSessionId,
+                doctor_id: doctorId,
+                created_at: serverTimestamp(),
+              }),
+            ),
+          )
+        }
+      }
+
+      // Upload attached files if any are selected
+      if (pendingFiles.length > 0) {
+        try {
+          setUploadingFile(true)
+          const uploadResults = await Promise.allSettled(
+            pendingFiles.map((item) => uploadSessionFile(item.file, currentPatientId, targetSessionId))
+          )
+
+          const failedFiles = uploadResults
+            .map((result, index) => ({ result, item: pendingFiles[index] }))
+            .filter(({ result }) => result.status === 'rejected')
+            .map(({ item, result }) => ({
+              ...item,
+              uploadError: result.reason?.message || 'Upload failed',
+            }))
+
+          if (failedFiles.length > 0) {
+            setPendingFiles(failedFiles)
+            setFileErrors(
+              failedFiles.map((item) => `${item.name}: ${item.uploadError}`),
+            )
+            showToast(
+              'Session saved, but some document uploads failed. Click Save Session again to retry failed uploads.',
+              'warning',
+            )
+            return
+          }
+
+          setPendingFiles([])
+          setFileErrors([])
+        } catch (uploadErr) {
+          console.error('File upload error:', uploadErr)
+          showToast(
+            'Session saved, but document upload encountered an error. Click Save Session again to retry.',
+            'warning',
+          )
+          return
+        } finally {
+          setUploadingFile(false)
+        }
+      }
+
+      // Save consultation form acknowledgements if any are attached
+      if (pendingConsultationForms.length > 0) {
+        try {
+          let formsToUpload = [...pendingConsultationForms]
+          const MAX_SYNC_ATTEMPTS = 3
+
+          for (let syncAttempt = 1; syncAttempt <= MAX_SYNC_ATTEMPTS; syncAttempt += 1) {
+            const results = await Promise.allSettled(
+              formsToUpload.map(async (item) => {
+                await saveConsultationFormRecord({
+                  sessionId: targetSessionId,
+                  patientId: currentPatientId,
+                  formId: item.formId,
+                  formLabel: item.formLabel,
+                  signatureUrl: null,
+                  storagePath: null,
+                })
+              }),
+            )
+
+            const failedForms = []
+            const succeededForms = []
+
+            results.forEach((result, index) => {
+              if (result.status === 'fulfilled') {
+                succeededForms.push(formsToUpload[index])
+              } else {
+                failedForms.push(formsToUpload[index])
+              }
+            })
+
+            formsToUpload = failedForms
+
+            if (formsToUpload.length === 0) {
+              setPendingConsultationForms([])
+              break
+            }
+
+            if (syncAttempt < MAX_SYNC_ATTEMPTS) {
+              await new Promise((resolve) => setTimeout(resolve, 400 * syncAttempt))
+            }
+          }
+
+          if (formsToUpload.length > 0) {
+            setPendingConsultationForms(formsToUpload)
+            showToast(
+              'Unable to sync some consultation acknowledgements to backend. Please check network and click Save Session once more.',
+              'warning',
+            )
+            return
+          }
+        } catch (cfErr) {
+          console.error('Consultation form upload error:', cfErr)
+          showToast(
+            'Consultation form sync failed unexpectedly. Please click Save Session once more.',
+            'warning',
+          )
+          return
+        }
+      }
+
+      showToast('Session saved successfully.', 'success')
+      window.setTimeout(() => navigate(`/patients/${currentPatientId}`), 700)
+    } catch (saveError) {
+      console.error('Save error:', saveError)
+      showToast(`Failed to save: ${saveError.message}`, 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+
+  if (loading) {
+    return (
+      <div className="space-y-4">
+        {Array.from({ length: 4 }).map((_, index) => (
+          <div
+            key={index}
+            className="h-40 animate-pulse rounded-lg border border-slate-200 bg-white p-6 shadow-sm"
+          >
+            <div className="h-5 w-40 rounded bg-slate-200" />
+            <div className="mt-6 h-10 rounded bg-slate-100" />
+            <div className="mt-4 h-10 w-2/3 rounded bg-slate-100" />
+          </div>
+        ))}
+      </div>
+    )
+  }
+
+
+  return (
+    // ─── FIX: single-scroll wrapper ──────────────────────────────────────────
+    // `relative` here gives the sticky bar a containing block it can anchor to.
+    // `pb-20` reserves space so the last section is never hidden behind the
+    // sticky bar when the user scrolls all the way to the bottom.
+    // Do NOT add overflow-y here; the ONE scroll bar belongs to the nearest
+    // ancestor that has overflow-y:auto/scroll (typically the page shell).
+    <div className="relative max-w-5xl mx-auto pb-20">
+
+      {/* ── Scrollable form content ── */}
+      <form id="new-session-form" onSubmit={handleSave} className="space-y-6">
+
+        {/* Page heading */}
+        <div className="flex flex-col gap-1">
+          <h2 className="text-xl font-semibold text-slate-900">New Session</h2>
+          <p className="text-sm text-slate-600">
+            Record clinical details, charting, billing, doctors, and attachments.
+          </p>
+        </div>
+
+        <Section title="Visit Info">
+          <div className="grid gap-4 lg:grid-cols-2">
+            <ReadOnlyField
+              label="Patient"
+              value={
+                patient
+                  ? `${patient.full_name} (${patient.patient_id})`
+                  : 'Patient not found'
+              }
+            />
+            <Field label="Visit Date" name="visit_date">
+              <input
+                id="visit_date"
+                name="visit_date"
+                type="date"
+                value={formData.visit_date}
+                onChange={handleFormChange}
+                className={inputClassName}
+              />
+            </Field>
+            <Field label="Visit Type" name="visit_type">
+              <div className="relative">
+                <select
+                  id="visit_type"
+                  name="visit_type"
+                  value={formData.visit_type}
+                  onChange={handleFormChange}
+                  className={`${inputClassName} appearance-none pr-10`}
+                >
+                  {visitTypes.map((type) => (
+                    <option key={type.value} value={type.value}>
+                      {type.label}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              </div>
+            </Field>
+            {formData.visit_type === 'Follow-up' && (
+              <Field label="Follow-up of which visit?" name="followup_of">
+                <select
+                  id="followup_of"
+                  name="followup_of"
+                  value={formData.followup_of}
+                  onChange={handleFormChange}
+                  className={inputClassName}
+                >
+                  <option value="">Select previous visit</option>
+                  {previousSessions.map((session) => (
+                    <option key={session.id} value={session.id}>
+                      {formatDate(session.visit_date)} — {session.chief_complaint}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            )}
+          </div>
+        </Section>
+
+        {/* Vital Signs */}
+        <Section title="Vital Signs">
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+            <Field label="Age (years)" name="age">
+              <input
+                type="number" min="0" max="120"
+                placeholder="e.g. 35"
+                value={age}
+                onChange={e => setAge(e.target.value)}
+                className={inputClassName}
+              />
+            </Field>
+            <Field label="Weight (kg)" name="weight">
+              <input
+                type="number" min="0"
+                placeholder="e.g. 70"
+                value={weight}
+                onChange={e => setWeight(e.target.value)}
+                className={inputClassName}
+              />
+            </Field>
+            <Field label="Blood Pressure" name="blood_pressure">
+              <input
+                type="text"
+                placeholder="e.g. 120/80 mmHg"
+                value={bloodPressure}
+                onChange={e => setBloodPressure(e.target.value)}
+                className={inputClassName}
+              />
+            </Field>
+            <Field label="Blood Sugar (mg/dL)" name="blood_sugar">
+              <input
+                type="number" min="0"
+                placeholder="e.g. 110"
+                value={bloodSugar}
+                onChange={e => setBloodSugar(e.target.value)}
+                className={inputClassName}
+              />
+            </Field>
+            <Field label="Pulse Rate (bpm)" name="pulse_rate">
+              <input
+                type="number" min="0"
+                placeholder="e.g. 72"
+                value={pulseRate}
+                onChange={e => setPulseRate(e.target.value)}
+                className={inputClassName}
+              />
+            </Field>
+            <Field label="SPO2 (%)" name="spo2">
+              <input
+                type="number" min="0" max="100"
+                placeholder="e.g. 98"
+                value={spo2}
+                onChange={e => setSpo2(e.target.value)}
+                className={inputClassName}
+              />
+            </Field>
+          </div>
+        </Section>
+
+        <Section title="Clinical Details">
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Field label="Chief Complaint" name="chief_complaint" required className="lg:col-span-2">
+              <textarea
+                id="chief_complaint"
+                name="chief_complaint"
+                rows="3"
+                value={formData.chief_complaint}
+                onChange={handleFormChange}
+                className={textareaClassName}
+                placeholder="Patient's main problem today"
+              />
+            </Field>
+            <Field label="Diagnosis" name="diagnosis">
+              <textarea
+                id="diagnosis"
+                name="diagnosis"
+                rows="3"
+                value={formData.diagnosis}
+                onChange={handleFormChange}
+                className={textareaClassName}
+                placeholder="Doctor's diagnosis"
+              />
+            </Field>
+            <Field label="Treatment Given" name="treatment_given">
+              <textarea
+                id="treatment_given"
+                name="treatment_given"
+                rows="3"
+                value={formData.treatment_given}
+                onChange={handleFormChange}
+                className={textareaClassName}
+                placeholder="Procedures and treatments performed today"
+              />
+            </Field>
+          </div>
+
+          <div className="mt-5 rounded-lg border border-slate-200 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <Syringe className="h-5 w-5 text-slate-500" />
+                <span className="text-sm font-medium text-slate-800">
+                  Injection Given?
+                </span>
+              </div>
+              <label className="inline-flex cursor-pointer items-center gap-3">
+                <span className="text-sm font-medium text-slate-600">
+                  {formData.injection_given ? 'YES' : 'NO'}
+                </span>
+                <input
+                  type="checkbox"
+                  name="injection_given"
+                  checked={formData.injection_given}
+                  onChange={handleFormChange}
+                  className="sr-only"
+                />
+                <span
+                  className={`flex h-6 w-11 items-center rounded-full p-1 transition ${
+                    formData.injection_given ? 'bg-teal-600' : 'bg-slate-300'
+                  }`}
+                >
+                  <span
+                    className={`h-4 w-4 rounded-full bg-white transition ${
+                      formData.injection_given ? 'translate-x-5' : ''
+                    }`}
+                  />
+                </span>
+              </label>
+            </div>
+            {formData.injection_given && (
+              <Field
+                label="Injection Details"
+                name="injection_details"
+                className="mt-4"
+              >
+                <input
+                  id="injection_details"
+                  name="injection_details"
+                  type="text"
+                  value={formData.injection_details}
+                  onChange={handleFormChange}
+                  className={inputClassName}
+                  placeholder="Injection type, location, dosage"
+                />
+              </Field>
+            )}
+          </div>
+        </Section>
+
+        <Section title="Dental Chart Entries">
+          <div className="grid gap-4 lg:grid-cols-4">
+            <Field label="Region" name="region">
+              <select
+                id="region"
+                name="region"
+                value={chartForm.region}
+                onChange={handleChartDraftChange}
+                className={inputClassName}
+              >
+                {regionOptions.map((region) => (
+                  <option key={region} value={region}>
+                    {region}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Tooth Number" name="tooth_number">
+              <input
+                id="tooth_number"
+                name="tooth_number"
+                type="text"
+                value={chartForm.tooth_number}
+                onChange={handleChartDraftChange}
+                className={inputClassName}
+                placeholder="e.g. 11, 36, 11 gamma (optional)"
+              />
+            </Field>
+            <Field label="Procedure Done" name="procedure_done" required>
+              <input
+                id="procedure_done"
+                name="procedure_done"
+                type="text"
+                value={chartForm.procedure_done}
+                onChange={handleChartDraftChange}
+                className={inputClassName}
+                placeholder="e.g. Root Canal, Extraction, Filling"
+              />
+            </Field>
+            <Field label="Notes" name="chart_notes">
+              <input
+                id="chart_notes"
+                name="notes"
+                type="text"
+                value={chartForm.notes}
+                onChange={handleChartDraftChange}
+                className={inputClassName}
+                placeholder="Optional notes"
+              />
+            </Field>
+          </div>
+          <button
+            type="button"
+            onClick={addChartEntry}
+            className="mt-4 inline-flex items-center gap-2 rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2"
+          >
+            <Plus className="h-4 w-4" />
+            Add Entry
+          </button>
+
+          {chartEntries.length > 0 && (
+            <div className="mt-5 space-y-3">
+              {chartEntries.map((entry) => (
+                <div
+                  key={entry.tempId}
+                  className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div className="flex flex-wrap items-center gap-2 text-sm text-slate-700">
+                    <span className="rounded-full bg-teal-50 px-2.5 py-1 text-xs font-semibold text-teal-700 ring-1 ring-teal-200">
+                      {entry.region}
+                    </span>
+                    {entry.tooth_number && (
+                      <span className="font-medium">Tooth {entry.tooth_number}</span>
+                    )}
+                    <span>{entry.procedure_done}</span>
+                    {entry.notes && <span className="text-slate-500">- {entry.notes}</span>}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => removeChartEntry(entry.tempId)}
+                    className="inline-flex w-fit items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-rose-600 transition hover:bg-rose-50"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                    Delete
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </Section>
+
+        {/* ── Consultation Forms ─────────────────────────────────── */}
+        <Section title="Consultation Forms">
+          <p className="mb-4 text-sm text-slate-600">
+            Select consultation forms acknowledged by the patient.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {CONSULTATION_FORMS.map((form) => {
+              const isAttached = pendingConsultationForms.some((p) => p.formId === form.id)
+              return (
+                <button
+                  key={form.id}
+                  type="button"
+                  onClick={() => {
+                    if (isAttached) return
+                    setConsultationModalForm(form)
+                    setModalHasRead(false)
+                  }}
+                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-sm font-medium ring-1 transition focus:outline-none focus:ring-2 focus:ring-teal-500 ${
+                    isAttached
+                      ? 'bg-teal-600 text-white ring-teal-600'
+                      : 'bg-slate-100 text-slate-700 ring-slate-200 hover:bg-slate-200'
+                  }`}
+                >
+                  {isAttached && <Check className="h-3.5 w-3.5" />}
+                  <FileText className="h-3.5 w-3.5" />
+                  {form.label}
+                </button>
+              )
+            })}
+          </div>
+
+          {/* Pending attached consultation forms list */}
+          {pendingConsultationForms.length > 0 && (
+            <div className="mt-4 space-y-2">
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                Attached consultation forms ({pendingConsultationForms.length})
+              </p>
+              {pendingConsultationForms.map((item) => (
+                <div
+                  key={item.formId}
+                  className="flex items-center justify-between gap-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <Check className="h-4 w-4 text-teal-600" />
+                    <span className="text-sm font-medium text-slate-700 truncate">
+                      {item.formLabel}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPendingConsultationForms((prev) =>
+                        prev.filter((p) => p.formId !== item.formId)
+                      )
+                    }}
+                    className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-rose-600 transition hover:bg-rose-50"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </Section>
+
+        {/* ── Consultation Form Modal ────────────────────────────── */}
+        {consultationModalForm && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            <div className="relative w-full max-w-4xl max-h-[95vh] overflow-y-auto rounded-xl bg-white shadow-2xl">
+              {/* Modal header */}
+              <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4 rounded-t-xl">
+                <h3 className="text-lg font-semibold text-slate-900">
+                  {consultationModalForm.label}
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setConsultationModalForm(null)}
+                  className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              {/* Modal body */}
+              <div className="p-6 space-y-5">
+                <iframe
+                  src={consultationModalForm.file}
+                  style={{ width: '100%', height: '70vh', border: 'none' }}
+                  title={consultationModalForm.label}
+                />
+
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={modalHasRead}
+                    onChange={(e) => setModalHasRead(e.target.checked)}
+                    className="h-4 w-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500"
+                  />
+                  <span className="text-sm font-medium text-slate-700">
+                    I confirm the patient has read and acknowledged this consultation form
+                  </span>
+                </label>
+              </div>
+
+              {/* Modal footer */}
+              <div className="sticky bottom-0 flex items-center justify-end gap-3 border-t border-slate-200 bg-white px-6 py-4 rounded-b-xl">
+                <button
+                  type="button"
+                  onClick={handleModalCancel}
+                  className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={!modalHasRead}
+                  onClick={handleConfirmAttach}
+                  className="rounded-md bg-teal-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Confirm Acknowledgement
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <Section title="Doctors Involved">
+          <p className="mb-4 text-sm text-slate-600">
+            Select all doctors involved in this visit
+          </p>
+          {doctors.length === 0 ? (
+            <p className="rounded-md bg-slate-50 px-4 py-3 text-sm text-slate-600">
+              No active doctors found. Please mark a doctor as Active in the Doctors page.
+            </p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {doctors.map((doctor) => {
+                const selected = selectedDoctorIds.includes(doctor.id)
+                return (
+                  <button
+                    key={doctor.id}
+                    type="button"
+                    onClick={() => toggleDoctor(doctor.id)}
+                    className={`rounded-full px-3 py-2 text-sm font-medium ring-1 transition focus:outline-none focus:ring-2 focus:ring-teal-500 ${
+                      selected
+                        ? 'bg-teal-600 text-white ring-teal-600'
+                        : 'bg-slate-100 text-slate-700 ring-slate-200 hover:bg-slate-200'
+                    }`}
+                  >
+                    {doctor.name}
+                    {doctor.specialty && (
+                      <span className={selected ? 'text-teal-50' : 'text-slate-500'}>
+                        {' '}
+                        · {doctor.specialty}
+                      </span>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </Section>
+
+        <Section title="Billing">
+          <div className="grid gap-4 lg:grid-cols-3">
+            <CurrencyField
+              label="Treatment Cost"
+              name="treatment_cost"
+              value={formData.treatment_cost}
+              onChange={handleFormChange}
+            />
+            <CurrencyField
+              label="Amount Paid"
+              name="amount_paid"
+              value={formData.amount_paid}
+              onChange={handleFormChange}
+            />
+            <div>
+              <label className="mb-1 block text-sm text-gray-500">Payment Status</label>
+              <span
+                className={`inline-block rounded-lg px-3 py-1.5 text-sm font-medium ${paymentStatusClassName(
+                  paymentStatus,
+                )}`}
+              >
+                {paymentStatus}
+              </span>
+            </div>
+          </div>
+        </Section>
+
+        <Section title="Additional Notes & Next Visit">
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Field label="Additional Notes" name="notes">
+              <textarea
+                id="notes"
+                name="notes"
+                rows="4"
+                value={formData.notes}
+                onChange={handleFormChange}
+                className={textareaClassName}
+                placeholder="Optional additional notes"
+              />
+            </Field>
+            <Field label="Next Visit Date" name="next_visit_date">
+              <input
+                id="next_visit_date"
+                name="next_visit_date"
+                type="date"
+                value={formData.next_visit_date}
+                onChange={handleFormChange}
+                className={inputClassName}
+              />
+            </Field>
+          </div>
+        </Section>
+
+        {/* ── Section 8 — Document Upload ─────────────────────────────────── */}
+        <Section title="Document Upload">
+          <div className="space-y-3">
+            <p className="text-xs text-slate-500">
+              <Paperclip className="inline h-3.5 w-3.5 mr-1 align-text-bottom text-slate-400" />
+              Allowed: PDF/JPG/PNG. Maximum file size: 0.5 MB per file. You can add multiple files.
+            </p>
+            <input
+              type="file"
+              multiple
+              accept=".pdf,.jpg,.jpeg,.png"
+              onChange={handleFilesSelected}
+              className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-md file:border file:border-slate-300 file:bg-white file:px-3 file:py-2 file:text-sm file:font-medium file:text-slate-700 file:transition hover:file:bg-slate-50"
+            />
+            {fileErrors.length > 0 && (
+              <div className="space-y-1">
+                {fileErrors.map((err, idx) => (
+                  <p key={idx} className="text-xs text-red-600 font-medium">⚠️ {err}</p>
+                ))}
+              </div>
+            )}
+            {pendingFiles.length > 0 && (
+              <div className="space-y-2 pt-2">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                  Pending uploads ({pendingFiles.length})
+                </p>
+                <div className="space-y-1.5">
+                  {pendingFiles.map((item) => (
+                    <div
+                      key={item.id}
+                      className="flex items-center justify-between gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2"
+                    >
+                      <div className="min-w-0 flex-1 flex items-center gap-2">
+                        <Paperclip className="h-4 w-4 text-teal-600 shrink-0" />
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium text-slate-700">
+                            {item.name}
+                          </p>
+                          <p className="text-xs text-slate-400">
+                            {formatFileSize(item.size)}
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removePendingFile(item.id)}
+                        className="inline-flex items-center gap-1 rounded border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-600 transition hover:bg-slate-50"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {uploadingFile && (
+              <div className="flex items-center gap-2 text-sm text-slate-500">
+                <Loader2 className="h-4 w-4 animate-spin text-teal-600" />
+                Uploading documents…
+              </div>
+            )}
+          </div>
+        </Section>
+
+      </form>
+
+      {/* ── Sticky bottom action bar ────────────────────────────────────────────
+           KEY CHANGES vs. original:
+           • Moved OUTSIDE the <form> so it is never part of the form's scroll flow.
+           • `sticky bottom-0` keeps it pinned to the visible viewport bottom as
+             the user scrolls — no matter how long the page gets.
+           • `z-10` ensures it layers above section cards.
+           • `bg-white` (fully opaque) prevents content bleeding through.
+           • The `pb-20` on the outer wrapper above creates the matching gap so
+             the last form section is never hidden behind this bar.
+           • The submit button uses `form="new-session-form"` to trigger the
+             <form>'s onSubmit even though the button is now outside it.
+      ─────────────────────────────────────────────────────────────────────── */}
+      <div className="sticky bottom-0 z-10 flex items-center justify-end gap-3 rounded-lg border border-slate-200 bg-white px-6 py-4 shadow-md mt-6">
+        <button
+          type="button"
+          onClick={() => navigate(-1)}
+          className="inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2"
+        >
+          <X className="h-4 w-4 mr-2" />
+          Cancel
+        </button>
+        <button
+          type="submit"
+          form="new-session-form"
+          disabled={saving || !patientId}
+          className="inline-flex items-center justify-center gap-2 rounded-md bg-teal-600 px-5 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-70"
+        >
+          {saving ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Save className="h-4 w-4" />
+          )}
+          Save Session
+        </button>
+      </div>
+
+    </div>
+  )
+}
+
+
+function Section({ title, children }) {
+  return (
+    <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+      <h3 className="mb-5 text-lg font-semibold tracking-normal text-slate-950">
+        {title}
+      </h3>
+      {children}
+    </section>
+  )
+}
+
+
+function Field({ label, name, required = false, className = '', children }) {
+  return (
+    <div className={className}>
+      <label htmlFor={name} className="block text-sm font-medium text-slate-700">
+        {label} {required && <span className="text-rose-600">*</span>}
+      </label>
+      {children}
+    </div>
+  )
+}
+
+
+function ReadOnlyField({ label, value }) {
+  return (
+    <div>
+      <p className="block text-sm font-medium text-slate-700">{label}</p>
+      <div className="mt-1 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-800">
+        {value}
+      </div>
+    </div>
+  )
+}
+
+
+function CurrencyField({ label, name, value, onChange }) {
+  return (
+    <Field label={label} name={name}>
+      <div className="relative mt-1">
+        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-medium text-slate-500">
+          ₹
+        </span>
+        <input
+          id={name}
+          name={name}
+          type="number"
+          min="0"
+          step="1"
+          value={value}
+          onChange={onChange}
+          className={`${inputClassName} pl-8`}
+          placeholder="0.00"
+        />
+      </div>
+    </Field>
+  )
+}
+
+
+const inputClassName =
+  'mt-1 block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20'
+
+
+const textareaClassName =
+  'mt-1 block w-full resize-y rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20'
+
+
+function formatDate(dateValue) {
+  if (!dateValue) return '-'
+  const d = toDate(dateValue)
+  if (!d) return '-'
+  return format(d, 'dd MMM yyyy')
+}
+
+
+function toDate(dateValue) {
+  if (!dateValue) return null
+  if (dateValue?.toDate) return dateValue.toDate()
+  const d = new Date(dateValue)
+  return isNaN(d.getTime()) ? null : d
+}
+
+
+function toMillis(dateValue) {
+  const d = toDate(dateValue)
+  return d ? d.getTime() : -Infinity
+}
+
+
+function paymentStatusClassName(status) {
+  if (status === 'Paid') return 'bg-green-100 text-green-700'
+  if (status === 'Partial') return 'bg-yellow-100 text-yellow-700'
+  return 'bg-red-100 text-red-600'
+}
+
+
+export default NewSession
