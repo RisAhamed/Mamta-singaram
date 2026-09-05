@@ -1,6 +1,7 @@
 import pg from 'pg'
 import dotenv from 'dotenv'
 import path from 'path'
+import process from 'node:process'
 import { fileURLToPath } from 'url'
 
 const __filename = fileURLToPath(import.meta.url)
