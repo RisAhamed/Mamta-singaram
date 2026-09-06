@@ -354,6 +354,14 @@ function EditSession() {
       window.alert('Chief complaint is required')
       return
     }
+    if (!nextVisitDate || !String(nextVisitDate).trim()) {
+      showToast('Next Appointment Date is required.', 'warning')
+      return
+    }
+    if (sessionFiles.length === 0 && pendingFiles.length === 0) {
+      showToast('Upload Photos is required — please add at least one photo/document.', 'warning')
+      return
+    }
 
     setSaving(true)
     const entriesToSave = [...chartEntries]
@@ -1160,24 +1168,24 @@ function EditSession() {
                 />
               </label>
               <label className="block text-sm text-gray-600">
-                Next Visit Date
+                Next Visit Date <span className="text-rose-600">*</span>
                 <input
                   type="date"
                   value={nextVisitDate}
                   onChange={(event) => setNextVisitDate(event.target.value)}
                   className="mt-1 w-full rounded border px-3 py-2"
+                  required
                 />
               </label>
             </div>
           </div>
 
-          {/* ── Documents Section ──────────────────────────────────── */}
+          {/* ── Upload Photos (mandatory) ──────────────────────────────────── */}
           <div className="mb-6 rounded-xl border bg-white p-4">
-            <h2 className="mb-3 font-semibold">Documents</h2>
+            <h2 className="mb-3 font-semibold">Upload Photos <span className="text-rose-600">*</span></h2>
             <div className="space-y-4">
               <p className="text-xs text-slate-500">
-                <Paperclip className="inline h-3.5 w-3.5 mr-1 align-text-bottom text-slate-400" />
-                Allowed: PDF/JPG/PNG. Maximum file size: 0.5 MB per file. You can add multiple files.
+                <span className="text-rose-600">*</span> Required — at least one photo/document is required. Allowed: PDF/JPG/PNG. Maximum file size: 0.5 MB per file. You can add multiple files. <span className="hidden sm:inline">On iPhone, tap to take a photo or choose from library.</span>
               </p>
 
               {/* Upload control / File Picker */}
@@ -1185,7 +1193,7 @@ function EditSession() {
                 <input
                   type="file"
                   multiple
-                  accept=".pdf,.jpg,.jpeg,.png"
+                  accept="image/*,application/pdf,.pdf,.jpg,.jpeg,.png"
                   onChange={handleFilesSelected}
                   className="flex-1 text-sm text-slate-600 file:mr-3 file:rounded-md file:border file:border-slate-300 file:bg-white file:px-3 file:py-2 file:text-sm file:font-medium file:text-slate-700 file:transition hover:file:bg-slate-50"
                 />

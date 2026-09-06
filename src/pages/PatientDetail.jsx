@@ -17,7 +17,11 @@ import {
   getSession,
   getSessionFiles,
   getConsultationForms,
+  getAppointments,
+  updateAppointment,
+  deleteAppointment,
 } from '../lib/api'
+import AppointmentDetailModal from '../components/AppointmentDetailModal'
 
 const filterOptions = [
   { label: '3M', value: '3M' },
@@ -37,6 +41,9 @@ function PatientDetail() {
   const [loading, setLoading] = useState(true)
   const [activeFilter, setActiveFilter] = useState('All')
   const [showMedicalHistory, setShowMedicalHistory] = useState(false)
+  const [appointments, setAppointments] = useState([])
+  const [apptFilter, setApptFilter] = useState('All')
+  const [selectedAppt, setSelectedAppt] = useState(null)
 
   useEffect(() => {
     const load = async () => {
@@ -137,6 +144,15 @@ function PatientDetail() {
 
         setSessions(sessionsWithDetails)
         setFollowupSessions(await buildFollowupSessions(sessionsWithDetails))
+
+        // Fetch appointments for this patient (patient history) - separate from session history
+        try {
+          const apptData = await getAppointments({ patient_id: patientId })
+          const apptArr = Array.isArray(apptData) ? apptData : apptData?.data ?? apptData?.rows ?? []
+          setAppointments(apptArr)
+        } catch {
+          setAppointments([])
+        }
       } catch (err) {
         console.error('PatientDetail load error:', err)
         showToast(err.message || 'Unable to load patient details.', 'error')
@@ -459,6 +475,65 @@ function PatientDetail() {
             </div>
           )}
         </section>
+
+        {/* Appointment History — separate from session history, connected via patient */}
+        <section className="flex flex-col gap-4">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3">
+              <h2 className="text-2xl font-semibold tracking-normal text-slate-950">Appointment History</h2>
+              <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200">{appointments.length} appts</span>
+            </div>
+            <div className="inline-flex w-full overflow-x-auto rounded-lg border border-slate-200 bg-white p-1 shadow-sm sm:w-fit">
+              {['All','Upcoming','Past'].map(opt=>(
+                <button key={opt} type="button" onClick={()=>setApptFilter(opt)} className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${apptFilter===opt?'bg-teal-600 text-white shadow-sm':'text-slate-600 hover:bg-slate-50'}`}>{opt}</button>
+              ))}
+            </div>
+          </div>
+
+          {(() => {
+            const now = new Date(); now.setHours(0,0,0,0)
+            const filtered = appointments.filter(a=>{
+              const d = toDate(a.appointment_date)
+              if(!d) return apptFilter==='All'
+              d.setHours(0,0,0,0)
+              if(apptFilter==='Upcoming') return d >= now && a.status !== 'Cancelled'
+              if(apptFilter==='Past') return d < now || a.status==='Completed' || a.status==='Cancelled' || a.status==='No-Show'
+              return true
+            }).sort((a,b)=> toDate(b.appointment_date)-toDate(a.appointment_date))
+            if(filtered.length===0) return <div className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">No appointments in this view</div>
+            return (
+              <div className="space-y-3">
+                {filtered.map(appt=>(
+                  <button key={appt.id} type="button" onClick={()=>setSelectedAppt(appt)} className="flex w-full items-center justify-between gap-4 rounded-lg border border-slate-200 bg-white p-4 text-left hover:bg-slate-50">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-slate-900">{appt.title || 'Appointment'} <span className={`ml-2 rounded-full px-2 py-0.5 text-xs ring-1 ${appt.status==='Completed'?'bg-emerald-50 text-emerald-700 ring-emerald-200': appt.status==='Cancelled'?'bg-slate-100 text-slate-600 ring-slate-200': appt.status==='No-Show'?'bg-rose-50 text-rose-700 ring-rose-200':'bg-blue-50 text-blue-700 ring-blue-200'}`}>{appt.status}</span></p>
+                      <p className="mt-1 text-xs text-slate-500">{formatDate(appt.appointment_date)} {appt.appointment_time ? `· ${String(appt.appointment_time).slice(0,5)}` : ''} {appt.location_name ? `· ${appt.location_name}` : ''}</p>
+                      {appt.notes && <p className="mt-1 truncate text-xs text-slate-600">{appt.notes}</p>}
+                      {appt.session_id && <p className="mt-1 text-xs text-teal-600">Related session →</p>}
+                    </div>
+                    <Calendar className="h-4 w-4 shrink-0 text-slate-400"/>
+                  </button>
+                ))}
+              </div>
+            )
+          })()}
+        </section>
+
+        {selectedAppt && (
+          <AppointmentDetailModal
+            appointment={selectedAppt}
+            onClose={()=>setSelectedAppt(null)}
+            onStatusChange={async (appt,status)=>{
+              try{ await updateAppointment(appt.id,{status}); showToast('Status updated','success'); const data=await getAppointments({patient_id: patientId}); const arr=Array.isArray(data)?data: data?.data ?? []; setAppointments(arr); setSelectedAppt(null)}catch(e){showToast(e.message,'error')}
+            }}
+            onDelete={async (appt)=>{
+              if(!confirm('Delete appointment?')) return
+              try{ await deleteAppointment(appt.id); showToast('Deleted','success'); const data=await getAppointments({patient_id: patientId}); const arr=Array.isArray(data)?data: data?.data ?? []; setAppointments(arr); setSelectedAppt(null)}catch(e){showToast(e.message,'error')}
+            }}
+            onNavigatePatient={(pid)=>{ setSelectedAppt(null); navigate(`/patients/${pid}`)}}
+            onNavigateSession={(sid)=>{ setSelectedAppt(null); if(sid) navigate(`/sessions/edit/${sid}`)}}
+          />
+        )}
       </div>
     </main>
   )

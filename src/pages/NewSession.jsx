@@ -355,6 +355,14 @@ function NewSession() {
       showToast('Chief Complaint is required.', 'warning')
       return
     }
+    if (!formData.next_visit_date || !String(formData.next_visit_date).trim()) {
+      showToast('Next Appointment Date is required.', 'warning')
+      return
+    }
+    if (pendingFiles.length === 0) {
+      showToast('Upload Photos is required — please add at least one photo/document.', 'warning')
+      return
+    }
 
     setSaving(true)
 
@@ -1118,7 +1126,7 @@ function NewSession() {
                 placeholder="Optional additional notes"
               />
             </Field>
-            <Field label="Next Visit Date" name="next_visit_date">
+            <Field label="Next Appointment Date" name="next_visit_date" required>
               <input
                 id="next_visit_date"
                 name="next_visit_date"
@@ -1126,22 +1134,22 @@ function NewSession() {
                 value={formData.next_visit_date}
                 onChange={handleFormChange}
                 className={inputClassName}
+                required
               />
             </Field>
           </div>
         </Section>
 
-        {/* ── Section 8 — Document Upload ─────────────────────────────────── */}
-        <Section title="Document Upload">
+        {/* ── Section 8 — Upload Photos (mandatory) ─────────────────────────────────── */}
+        <Section title="Upload Photos">
           <div className="space-y-3">
             <p className="text-xs text-slate-500">
-              <Paperclip className="inline h-3.5 w-3.5 mr-1 align-text-bottom text-slate-400" />
-              Allowed: PDF/JPG/PNG. Maximum file size: 0.5 MB per file. You can add multiple files.
+              <span className="text-rose-600">*</span> Required — at least one photo/document is required for new sessions. Allowed: PDF/JPG/PNG. Maximum file size: 0.5 MB per file. You can add multiple files. <span className="hidden sm:inline">On iPhone, tap to take a photo or choose from library.</span>
             </p>
             <input
               type="file"
               multiple
-              accept=".pdf,.jpg,.jpeg,.png"
+              accept="image/*,application/pdf,.pdf,.jpg,.jpeg,.png"
               onChange={handleFilesSelected}
               className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-md file:border file:border-slate-300 file:bg-white file:px-3 file:py-2 file:text-sm file:font-medium file:text-slate-700 file:transition hover:file:bg-slate-50"
             />

@@ -131,6 +131,7 @@ router.post('/', async (req, res) => {
 
     if (!patient_id) return res.status(400).json({ error: 'patient_id is required' })
     if (!chief_complaint || !chief_complaint.trim()) return res.status(400).json({ error: 'chief_complaint is required' })
+    if (!next_visit_date || !String(next_visit_date).trim()) return res.status(400).json({ error: 'next_visit_date is required' })
 
     const chartList = chart_entries || dental_chart_entries || []
     const doctorList = doctors || []

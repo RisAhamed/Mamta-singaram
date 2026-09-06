@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import {
+  CalendarDays,
   IndianRupee,
   LayoutDashboard,
   Menu,
@@ -16,6 +17,7 @@ import { CONSULTATION_FORMS } from '../lib/consultationForms'
 const navigationItems = [
   { label: 'Dashboard', path: '/', icon: LayoutDashboard, aliases: ['/dashboard'] },
   { label: 'Patients', path: '/patients', icon: Users },
+  { label: 'Appointments', path: '/appointments', icon: CalendarDays },
   { label: 'Doctors', path: '/doctors', icon: Stethoscope },
   { label: 'Payments', path: '/payments', icon: IndianRupee },
 ]
@@ -30,6 +32,7 @@ const routeTitles = [
   { matcher: /^\/patients\/[^/]+\/edit$/, title: 'Edit Patient' },
   { matcher: /^\/patients\/[^/]+$/, title: 'Patient Detail' },
   { matcher: /^\/patients$/, title: 'Patients' },
+  { matcher: /^\/appointments$/, title: 'Appointments' },
   { matcher: /^\/doctors$/, title: 'Doctors' },
   { matcher: /^\/payments$/, title: 'Payments' },
   { matcher: /^\/search$/, title: 'Search' },
