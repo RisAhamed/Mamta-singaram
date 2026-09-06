@@ -14,6 +14,7 @@ import {
 import { useNavigate, useParams } from 'react-router-dom'
 import { useToast } from '../hooks/useToast'
 import { CONSULTATION_FORMS } from '../lib/consultationForms'
+import MasterSelect from '../components/MasterSelect'
 import {
   getPatient,
   getDoctors,
@@ -23,6 +24,13 @@ import {
   validateSessionFile,
   formatFileSize,
   createConsultationForm,
+  getLocations,
+  createLocation,
+  getFacialBones,
+  createFacialBone,
+  getLabVendors,
+  createLabVendor,
+  upsertSurgeryNotes,
 } from '../lib/api'
 
 
@@ -106,6 +114,12 @@ function NewSession() {
   const [pendingConsultationForms, setPendingConsultationForms] = useState([])
   const [consultationModalForm, setConsultationModalForm] = useState(null)
   const [modalHasRead, setModalHasRead] = useState(false)
+
+  // ── Master-data dropdowns ──
+  const [locationId, setLocationId] = useState('')
+  const [surgeryNotes, setSurgeryNotes] = useState('')
+  const [facialBoneId, setFacialBoneId] = useState('')
+  const [labVendorId, setLabVendorId] = useState('')
 
   // Modal action handlers (prevent implicit form submit when nested inside the main form)
   const handleModalCancel = (event) => {
@@ -385,6 +399,7 @@ function NewSession() {
             procedure_done: e.procedure_done,
             notes: e.notes || null,
           })),
+          location_id: locationId || null,
         }
 
         const created = await createSession(sessionData)
@@ -398,6 +413,13 @@ function NewSession() {
           targetSessionId = newId
         }
         setCreatedSessionId(targetSessionId)
+      }
+
+      // Persist surgery notes (dedicated table) if provided
+      if (surgeryNotes.trim() || facialBoneId) {
+        try {
+          await upsertSurgeryNotes(targetSessionId, { notes: surgeryNotes.trim(), facial_bone_id: facialBoneId || null })
+        } catch (e) { console.error('surgery notes save failed', e); showToast(e.message, 'warning') }
       }
 
       // Upload attached files if any are selected
@@ -605,6 +627,9 @@ function NewSession() {
                 </select>
               </Field>
             )}
+            <div className="lg:col-span-2">
+              <MasterSelect label="Location" value={locationId} onChange={setLocationId} fetchFn={getLocations} createFn={createLocation} placeholder="Select location" />
+            </div>
           </div>
         </Section>
 
@@ -992,6 +1017,29 @@ function NewSession() {
             </div>
           </div>
         )}
+
+        <Section title="Surgery Notes">
+          <p className="mb-4 text-sm text-slate-600">Dedicated surgery notes preserved per session.</p>
+          <div className="space-y-4">
+            <MasterSelect label="Facial Bone" value={facialBoneId} onChange={setFacialBoneId} fetchFn={getFacialBones} createFn={createFacialBone} placeholder="Select facial bone" />
+            <div>
+              <label htmlFor="surgery_notes" className="block text-sm font-medium text-slate-700">Surgery Notes</label>
+              <textarea
+                id="surgery_notes"
+                rows={3}
+                value={surgeryNotes}
+                onChange={(e) => setSurgeryNotes(e.target.value)}
+                className={textareaClassName}
+                placeholder="Dedicated surgery notes..."
+              />
+            </div>
+          </div>
+        </Section>
+
+        <Section title="Lab / Vendor">
+          <MasterSelect label="Lab / Vendor" value={labVendorId} onChange={setLabVendorId} fetchFn={getLabVendors} createFn={createLabVendor} placeholder="Select lab/vendor" />
+          <p className="mt-2 text-xs text-slate-500">This demonstrates reusable vendor dropdown; historical references preserved, inactive hidden.</p>
+        </Section>
 
         <Section title="Doctors Involved">
           <p className="mb-4 text-sm text-slate-600">

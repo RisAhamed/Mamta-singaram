@@ -57,6 +57,7 @@ export function getSessions(filters = {}) {
   if (filters.payment_status) params.set('payment_status', filters.payment_status)
   if (filters.visit_date_from) params.set('visit_date_from', filters.visit_date_from)
   if (filters.visit_date_to) params.set('visit_date_to', filters.visit_date_to)
+  if (filters.location_id) params.set('location_id', filters.location_id)
   const qs = params.toString() ? `?${params.toString()}` : ''
   return request(`/api/sessions${qs}`)
 }
@@ -107,6 +108,90 @@ export async function uploadSessionFile(sessionId, file, metadata = {}) {
   return data
 }
 export function deleteSessionFile(fileId) { return request(`/api/files/${fileId}`, { method: 'DELETE' }) }
+
+// Locations (master)
+export function getLocations(isActive) {
+  if (isActive === true) return request('/api/locations?is_active=true')
+  if (isActive === false) return request('/api/locations?is_active=false')
+  return request('/api/locations')
+}
+export function createLocation(data) { return request('/api/locations', { method: 'POST', body: JSON.stringify(data) }) }
+export function updateLocation(id, data) { return request(`/api/locations/${id}`, { method: 'PUT', body: JSON.stringify(data) }) }
+export function deleteLocation(id) { return request(`/api/locations/${id}`, { method: 'DELETE' }) }
+
+// Lab Vendors (master)
+export function getLabVendors(isActive) {
+  if (isActive === true) return request('/api/lab-vendors?is_active=true')
+  if (isActive === false) return request('/api/lab-vendors?is_active=false')
+  return request('/api/lab-vendors')
+}
+export function createLabVendor(data) { return request('/api/lab-vendors', { method: 'POST', body: JSON.stringify(data) }) }
+export function updateLabVendor(id, data) { return request(`/api/lab-vendors/${id}`, { method: 'PUT', body: JSON.stringify(data) }) }
+export function deleteLabVendor(id) { return request(`/api/lab-vendors/${id}`, { method: 'DELETE' }) }
+
+// Facial Bones (master)
+export function getFacialBones(isActive) {
+  if (isActive === true) return request('/api/facial-bones?is_active=true')
+  if (isActive === false) return request('/api/facial-bones?is_active=false')
+  return request('/api/facial-bones')
+}
+export function createFacialBone(data) { return request('/api/facial-bones', { method: 'POST', body: JSON.stringify(data) }) }
+export function updateFacialBone(id, data) { return request(`/api/facial-bones/${id}`, { method: 'PUT', body: JSON.stringify(data) }) }
+export function deleteFacialBone(id) { return request(`/api/facial-bones/${id}`, { method: 'DELETE' }) }
+
+// Surgery Forms (framework)
+export function getSurgeryForms(isActive) {
+  if (isActive === true) return request('/api/surgery-forms?is_active=true')
+  if (isActive === false) return request('/api/surgery-forms?is_active=false')
+  return request('/api/surgery-forms')
+}
+export function createSurgeryForm(data) { return request('/api/surgery-forms', { method: 'POST', body: JSON.stringify(data) }) }
+export function updateSurgeryForm(id, data) { return request(`/api/surgery-forms/${id}`, { method: 'PUT', body: JSON.stringify(data) }) }
+export function deleteSurgeryForm(id) { return request(`/api/surgery-forms/${id}`, { method: 'DELETE' }) }
+
+// Appointments
+export function getAppointments(filters = {}) {
+  const p = new URLSearchParams()
+  if (filters.patient_id) p.set('patient_id', filters.patient_id)
+  if (filters.session_id) p.set('session_id', filters.session_id)
+  if (filters.status) p.set('status', filters.status)
+  if (filters.location_id) p.set('location_id', filters.location_id)
+  if (filters.date_from) p.set('date_from', filters.date_from)
+  if (filters.date_to) p.set('date_to', filters.date_to)
+  const qs = p.toString() ? `?${p.toString()}` : ''
+  return request(`/api/appointments${qs}`)
+}
+export function getAppointment(id) { return request(`/api/appointments/${id}`) }
+export function createAppointment(data) { return request('/api/appointments', { method: 'POST', body: JSON.stringify(data) }) }
+export function updateAppointment(id, data) { return request(`/api/appointments/${id}`, { method: 'PUT', body: JSON.stringify(data) }) }
+export function deleteAppointment(id) { return request(`/api/appointments/${id}`, { method: 'DELETE' }) }
+
+// Surgery Notes (per session)
+export function getSurgeryNotes(sessionId) { return request(`/api/sessions/${sessionId}/surgery-notes`) }
+export function upsertSurgeryNotes(sessionId, data) { return request(`/api/sessions/${sessionId}/surgery-notes`, { method: 'PUT', body: JSON.stringify(data) }) }
+export function deleteSurgeryNotes(sessionId) { return request(`/api/sessions/${sessionId}/surgery-notes`, { method: 'DELETE' }) }
+
+// Lab Entries (per session)
+export function getLabEntries(sessionId) { return request(`/api/sessions/${sessionId}/lab-entries`) }
+export function createLabEntry(sessionId, data) { return request(`/api/sessions/${sessionId}/lab-entries`, { method: 'POST', body: JSON.stringify(data) }) }
+export function updateLabEntry(sessionId, entryId, data) { return request(`/api/sessions/${sessionId}/lab-entries/${entryId}`, { method: 'PUT', body: JSON.stringify(data) }) }
+export function deleteLabEntry(sessionId, entryId) { return request(`/api/sessions/${sessionId}/lab-entries/${entryId}`, { method: 'DELETE' }) }
+
+// Patient Ledger (financial history - immutable audit)
+export function getPatientLedger(patientId, filters = {}) {
+  const p = new URLSearchParams()
+  if (filters.from) p.set('from', filters.from)
+  if (filters.to) p.set('to', filters.to)
+  const qs = p.toString() ? `?${p.toString()}` : ''
+  return request(`/api/patients/${patientId}/ledger${qs}`)
+}
+export function createLedgerEntry(patientId, data) { return request(`/api/patients/${patientId}/ledger`, { method: 'POST', body: JSON.stringify(data) }) }
+export function deleteLedgerEntry(patientId, entryId) { return request(`/api/patients/${patientId}/ledger/${entryId}`, { method: 'DELETE' }) }
+
+// Session Surgery Forms (link)
+export function getSessionSurgeryForms(sessionId) { return request(`/api/sessions/${sessionId}/surgery-forms`) }
+export function linkSurgeryForm(sessionId, data) { return request(`/api/sessions/${sessionId}/surgery-forms`, { method: 'POST', body: JSON.stringify(data) }) }
+export function unlinkSurgeryForm(sessionId, linkId) { return request(`/api/sessions/${sessionId}/surgery-forms/${linkId}`, { method: 'DELETE' }) }
 
 // Helpers kept for frontend compatibility
 export function formatFileSize(bytes) {

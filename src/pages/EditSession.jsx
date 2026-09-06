@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import { useToast } from '../hooks/useToast'
 import { CONSULTATION_FORMS } from '../lib/consultationForms'
+import MasterSelect from '../components/MasterSelect'
 import {
   getSession,
   getPatient,
@@ -26,6 +27,15 @@ import {
   deleteConsultationForm,
   validateSessionFile,
   formatFileSize,
+  getLocations,
+  createLocation,
+  getFacialBones,
+  createFacialBone,
+  getLabVendors,
+  createLabVendor,
+  getSurgeryNotes,
+  upsertSurgeryNotes,
+  deleteSurgeryNotes,
 } from '../lib/api'
 
 const emptyChartForm = {
@@ -58,6 +68,13 @@ function EditSession() {
   const [chartForm, setChartForm] = useState(emptyChartForm)
   const [allDoctors, setAllDoctors] = useState([])
   const [selectedDoctors, setSelectedDoctors] = useState([])
+
+  const [locationId, setLocationId] = useState('')
+  const [locationNameSnapshot, setLocationNameSnapshot] = useState('')
+  const [surgeryNotes, setSurgeryNotes] = useState('')
+  const [facialBoneId, setFacialBoneId] = useState('')
+  const [facialBoneNameSnapshot, setFacialBoneNameSnapshot] = useState('')
+  const [labVendorId, setLabVendorId] = useState('')
 
   const [age, setAge] = useState('')
   const [weight, setWeight] = useState('')
@@ -130,6 +147,26 @@ function EditSession() {
         setPaymentStatus(session.payment_status || 'Pending')
         setNotes(session.notes || '')
         setNextVisitDate(formatInputDate(session.next_visit_date))
+        setLocationId(session.location_id || '')
+        setLocationNameSnapshot(session.location_name || '')
+        // Fetch surgery notes (dedicated per-session)
+        try {
+          const snRes = await getSurgeryNotes(sid)
+          const sn = snRes?.data ?? snRes?.surgery_notes ?? snRes
+          // handle array vs object
+          const snObj = Array.isArray(sn) ? sn[0] : sn
+          if (snObj && (snObj.notes || snObj.facial_bone_id || snObj.facial_bone_name)) {
+            setSurgeryNotes(snObj.notes || '')
+            setFacialBoneId(snObj.facial_bone_id || '')
+            setFacialBoneNameSnapshot(snObj.facial_bone_name || snObj.facialBoneName || '')
+          } else if (snObj && typeof snObj === 'object' && snObj.notes !== undefined) {
+            setSurgeryNotes(snObj.notes || '')
+            setFacialBoneId(snObj.facial_bone_id || '')
+            setFacialBoneNameSnapshot(snObj.facial_bone_name || '')
+          }
+        } catch (e) {
+          void e
+        }
 
         // Handle both nested vitals and flat columns
         if (session.vitals) {
@@ -343,6 +380,7 @@ function EditSession() {
         blood_sugar: bloodSugar ? parseFloat(bloodSugar) : null,
         pulse_rate: pulseRate ? parseInt(pulseRate) : null,
         spo2: spo2 ? parseInt(spo2) : null,
+        location_id: locationId || null,
         doctors: doctorsToSave,
         chart_entries: entriesToSave.map((entry) => ({
           region: entry.region,
@@ -467,6 +505,14 @@ function EditSession() {
         }
       }
 
+      // Surgery notes upsert / delete (dedicated per-session)
+      if (surgeryNotes.trim() || facialBoneId) {
+        try { await upsertSurgeryNotes(sessionId, { notes: surgeryNotes.trim(), facial_bone_id: facialBoneId || null }) } catch(e){ console.error(e); showToast(e.message,'warning') }
+      } else {
+        // Both empty -> attempt delete if existing record
+        try { await deleteSurgeryNotes(sessionId) } catch (e) { void e }
+      }
+
       showToast('Session updated successfully.', 'success')
       window.setTimeout(() => navigate(`/patients/${patientId}`), 700)
     } catch (error) {
@@ -583,6 +629,9 @@ function EditSession() {
                   <option>Routine Checkup</option>
                 </select>
               </label>
+            </div>
+            <div className="mt-3">
+              <MasterSelect label="Location" value={locationId} onChange={setLocationId} fetchFn={getLocations} createFn={createLocation} placeholder="Select location" currentValueLabel={locationNameSnapshot} />
             </div>
           </div>
 
@@ -1019,6 +1068,22 @@ function EditSession() {
               </div>
             </div>
           )}
+
+          <div className="mb-4 rounded-xl border bg-white p-4">
+            <h2 className="mb-3 font-semibold">Surgery Notes</h2>
+            <p className="mb-3 text-sm text-gray-600">Dedicated surgery notes preserved per session. Historical facial bone selection remains even if master changes.</p>
+            <MasterSelect label="Facial Bone" value={facialBoneId} onChange={setFacialBoneId} fetchFn={getFacialBones} createFn={createFacialBone} placeholder="Select facial bone" currentValueLabel={facialBoneNameSnapshot} />
+            <label className="block mt-3 text-sm text-gray-600">
+              Dedicated Surgery Notes
+              <textarea value={surgeryNotes} onChange={e=>setSurgeryNotes(e.target.value)} className="mt-1 w-full rounded border px-3 py-2" rows={3} placeholder="Dedicated surgery notes..." />
+            </label>
+          </div>
+
+          <div className="mb-4 rounded-xl border bg-white p-4">
+            <h2 className="mb-3 font-semibold">Lab / Vendor</h2>
+            <MasterSelect label="Lab / Vendor" value={labVendorId} onChange={setLabVendorId} fetchFn={getLabVendors} createFn={createLabVendor} placeholder="Select lab/vendor" />
+            <p className="mt-2 text-xs text-gray-500">Reusable vendor dropdown; historical references preserved, inactive hidden.</p>
+          </div>
 
           <div className="mb-4 rounded-xl border bg-white p-4">
             <h2 className="mb-3 font-semibold">Doctors</h2>

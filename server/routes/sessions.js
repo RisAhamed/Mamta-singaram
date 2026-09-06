@@ -33,7 +33,7 @@ function extractVitals(body) {
 // GET / - list sessions with optional filters
 router.get('/', async (req, res) => {
   try {
-    const { patient_id, payment_status, visit_date_from, visit_date_to } = req.query
+    const { patient_id, payment_status, visit_date_from, visit_date_to, location_id } = req.query
     const conditions = []
     const values = []
     let idx = 1
@@ -56,6 +56,11 @@ router.get('/', async (req, res) => {
     if (visit_date_to) {
       conditions.push(`visit_date <= $${idx}`)
       values.push(visit_date_to)
+      idx++
+    }
+    if (location_id) {
+      conditions.push(`location_id = $${idx}`)
+      values.push(location_id)
       idx++
     }
 
@@ -115,6 +120,7 @@ router.post('/', async (req, res) => {
       payment_status,
       notes,
       next_visit_date,
+      location_id,
       doctors,
       chart_entries,
       // also allow alternative name
@@ -129,12 +135,24 @@ router.post('/', async (req, res) => {
     const chartList = chart_entries || dental_chart_entries || []
     const doctorList = doctors || []
 
+    // Resolve location snapshot (before transaction - no rollback needed yet)
+    let location_name = req.body.location_name || null
+    let resolvedLocationId = location_id || null
+    if (resolvedLocationId) {
+      // Use pool for pre-check to avoid needing transaction
+      const lr = await pool.query('SELECT name FROM locations WHERE id = $1', [resolvedLocationId])
+      if (!lr.rows.length) return res.status(400).json({ error: 'Invalid location_id' })
+      location_name = lr.rows[0].name
+    } else if (req.body.location_name) {
+      location_name = String(req.body.location_name).trim() || null
+    }
+
     await client.query('BEGIN')
 
     const sessionRes = await client.query(
       `INSERT INTO sessions
-        (patient_id, visit_date, visit_type, followup_of, chief_complaint, diagnosis, treatment_given, injection_given, injection_details, treatment_cost, amount_paid, payment_status, notes, next_visit_date, age, weight, blood_pressure, blood_sugar, pulse_rate, spo2)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
+        (patient_id, visit_date, visit_type, followup_of, chief_complaint, diagnosis, treatment_given, injection_given, injection_details, treatment_cost, amount_paid, payment_status, notes, next_visit_date, location_id, location_name, age, weight, blood_pressure, blood_sugar, pulse_rate, spo2)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
        RETURNING *`,
       [
         patient_id,
@@ -151,6 +169,8 @@ router.post('/', async (req, res) => {
         payment_status || 'Pending',
         notes ? notes.trim() : null,
         next_visit_date || null,
+        resolvedLocationId,
+        location_name,
         vitals.age,
         vitals.weight,
         vitals.blood_pressure,
@@ -220,6 +240,7 @@ router.put('/:id', async (req, res) => {
       payment_status,
       notes,
       next_visit_date,
+      location_id,
       doctors,
       chart_entries,
       dental_chart_entries,
@@ -239,7 +260,7 @@ router.put('/:id', async (req, res) => {
 
     await client.query('BEGIN')
 
-    // Build dynamic update
+    // Build dynamic update - handle location snapshot
     const fields = {}
     if (patient_id !== undefined) fields.patient_id = patient_id
     if (visit_date !== undefined) fields.visit_date = visit_date
@@ -255,6 +276,22 @@ router.put('/:id', async (req, res) => {
     if (payment_status !== undefined) fields.payment_status = payment_status
     if (notes !== undefined) fields.notes = notes
     if (next_visit_date !== undefined) fields.next_visit_date = next_visit_date || null
+    if (location_id !== undefined) {
+      if (location_id === null || location_id === '') {
+        fields.location_id = null
+        fields.location_name = null
+      } else {
+        const lr = await client.query('SELECT name FROM locations WHERE id = $1', [location_id])
+        if (!lr.rows.length) {
+          await client.query('ROLLBACK').catch(()=>{})
+          return res.status(400).json({ error: 'Invalid location_id' })
+        }
+        fields.location_id = location_id
+        fields.location_name = lr.rows[0].name
+      }
+    } else if (req.body.location_name !== undefined) {
+      fields.location_name = req.body.location_name ? String(req.body.location_name).trim() : null
+    }
     if (vitals.age !== undefined) fields.age = vitals.age
     if (vitals.weight !== undefined) fields.weight = vitals.weight
     if (vitals.blood_pressure !== undefined) fields.blood_pressure = vitals.blood_pressure
