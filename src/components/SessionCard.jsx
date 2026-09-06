@@ -34,10 +34,10 @@ function SessionCard({ session, followupSession, onEdit, onDeleteFile }) {
   const navigate = useNavigate()
   const [showTreatment, setShowTreatment] = useState(false)
   const [viewConsultationForm, setViewConsultationForm] = useState(null)
-  const chartEntries = session.chartEntries || []
+  const chartEntries = session.chartEntries || session.dental_chart_entries || []
   const doctors = session.doctors || []
-  const files = session.files || []
-  const consultationForms = session.consultationForms || []
+  const files = session.files || session.session_files || []
+  const consultationForms = session.consultationForms || session.consultation_forms || []
   const hasLongTreatment = (session.treatment_given || '').length > 140
   const isEdited = isDifferentDateTime(session.created_at, session.updated_at)
 
@@ -95,17 +95,21 @@ function SessionCard({ session, followupSession, onEdit, onDeleteFile }) {
         </button>
       </div>
 
-      {/* Session Vitals Display */}
-      {session.vitals && Object.values(session.vitals).some(v => v !== null) && (
-        <div className="mt-4 flex flex-wrap gap-2">
-          {session.vitals.age && <span className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full border border-blue-100">Age: {session.vitals.age}y</span>}
-          {session.vitals.weight && <span className="text-xs bg-green-50 text-green-600 px-2 py-0.5 rounded-full border border-green-100">Wt: {session.vitals.weight}kg</span>}
-          {session.vitals.blood_pressure && <span className="text-xs bg-red-50 text-red-600 px-2 py-0.5 rounded-full border border-red-100">BP: {session.vitals.blood_pressure}</span>}
-          {session.vitals.blood_sugar && <span className="text-xs bg-yellow-50 text-yellow-600 px-2 py-0.5 rounded-full border border-yellow-100">Sugar: {session.vitals.blood_sugar}mg/dL</span>}
-          {session.vitals.pulse_rate && <span className="text-xs bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full border border-purple-100">Pulse: {session.vitals.pulse_rate}bpm</span>}
-          {session.vitals.spo2 && <span className="text-xs bg-teal-50 text-teal-600 px-2 py-0.5 rounded-full border border-teal-100">SPO2: {session.vitals.spo2}%</span>}
-        </div>
-      )}
+      {/* Session Vitals Display - supports both nested vitals and flat columns */}
+      {(() => {
+        const v = session.vitals || { age: session.age, weight: session.weight, blood_pressure: session.blood_pressure, blood_sugar: session.blood_sugar, pulse_rate: session.pulse_rate, spo2: session.spo2 }
+        if (!v || !Object.values(v).some(x => x !== null && x !== '' && x !== undefined)) return null
+        return (
+          <div className="mt-4 flex flex-wrap gap-2">
+            {v.age && <span className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full border border-blue-100">Age: {v.age}y</span>}
+            {v.weight && <span className="text-xs bg-green-50 text-green-600 px-2 py-0.5 rounded-full border border-green-100">Wt: {v.weight}kg</span>}
+            {v.blood_pressure && <span className="text-xs bg-red-50 text-red-600 px-2 py-0.5 rounded-full border border-red-100">BP: {v.blood_pressure}</span>}
+            {v.blood_sugar && <span className="text-xs bg-yellow-50 text-yellow-600 px-2 py-0.5 rounded-full border border-yellow-100">Sugar: {v.blood_sugar}mg/dL</span>}
+            {v.pulse_rate && <span className="text-xs bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full border border-purple-100">Pulse: {v.pulse_rate}bpm</span>}
+            {v.spo2 && <span className="text-xs bg-teal-50 text-teal-600 px-2 py-0.5 rounded-full border border-teal-100">SPO2: {v.spo2}%</span>}
+          </div>
+        )
+      })()}
 
       <div className="mt-5 space-y-4">
         <div>
@@ -214,9 +218,9 @@ function SessionCard({ session, followupSession, onEdit, onDeleteFile }) {
                     )}
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0">
-                    <button
+                      <button
                       type="button"
-                      onClick={() => window.open(file.download_url, '_blank', 'noopener,noreferrer')}
+                      onClick={() => window.open(file.download_url || file.file_url || file.url, '_blank', 'noopener,noreferrer')}
                       className="inline-flex items-center gap-1 rounded border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-teal-700 transition hover:bg-teal-50"
                     >
                       <ExternalLink className="h-3 w-3" />

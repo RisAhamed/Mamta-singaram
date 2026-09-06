@@ -2,18 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Check, Edit2, Loader2, Plus, Stethoscope, Trash2, X } from 'lucide-react'
 import Skeleton from '../components/Skeleton'
 import { useToast } from '../hooks/useToast'
-import { db } from '../lib/firebase'
-import {
-  addDoc,
-  collection,
-  deleteDoc,
-  doc,
-  getDocs,
-  orderBy,
-  query,
-  serverTimestamp,
-  updateDoc,
-} from 'firebase/firestore'
+import { getDoctors, createDoctor, updateDoctor, deleteDoctor } from '../lib/api'
 
 const emptyForm = {
   name: '',
@@ -21,6 +10,7 @@ const emptyForm = {
   qualification: '',
   phone: '',
   email: '',
+  is_active: true,
 }
 
 function Doctors() {
@@ -32,25 +22,27 @@ function Doctors() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingDoctor, setEditingDoctor] = useState(null)
   const [formData, setFormData] = useState(emptyForm)
+  const [statusFilter, setStatusFilter] = useState('all')
 
-  const loadDoctors = useCallback(async () => {
+  const loadDoctors = useCallback(async (filter = statusFilter) => {
     setLoading(true)
 
     try {
-      const snap = await getDocs(
-        query(collection(db, 'doctors'), orderBy('created_at', 'desc')),
-      )
-      setDoctors(snap.docs.map((doctor) => ({ id: doctor.id, ...doctor.data() })))
+      const isActive =
+        filter === 'active' ? true : filter === 'inactive' ? false : undefined
+      const data = await getDoctors(isActive)
+      const list = Array.isArray(data) ? data : (data?.data ?? data?.doctors ?? [])
+      setDoctors(list)
     } catch (fetchError) {
       showToast(fetchError.message || 'Unable to load doctors.', 'error')
     } finally {
       setLoading(false)
     }
-  }, [showToast])
+  }, [showToast, statusFilter])
 
   useEffect(() => {
-    Promise.resolve().then(loadDoctors)
-  }, [loadDoctors])
+    Promise.resolve().then(() => loadDoctors(statusFilter))
+  }, [loadDoctors, statusFilter])
 
   const openAddModal = () => {
     setEditingDoctor(null)
@@ -66,6 +58,7 @@ function Doctors() {
       qualification: doctor.qualification || '',
       phone: doctor.phone || '',
       email: doctor.email || '',
+      is_active: doctor.is_active ?? true,
     })
     setIsModalOpen(true)
   }
@@ -79,8 +72,8 @@ function Doctors() {
   }
 
   const handleInputChange = (event) => {
-    const { name, value } = event.target
-    setFormData((current) => ({ ...current, [name]: value }))
+    const { name, type, checked, value } = event.target
+    setFormData((current) => ({ ...current, [name]: type === 'checkbox' ? checked : value }))
   }
 
   const handleSubmit = async (event) => {
@@ -97,26 +90,19 @@ function Doctors() {
       qualification: formData.qualification.trim() || null,
       phone: formData.phone.trim() || null,
       email: formData.email.trim() || null,
+      is_active: Boolean(formData.is_active),
     }
 
     setSaving(true)
 
     try {
       if (editingDoctor) {
-        await updateDoc(doc(db, 'doctors', editingDoctor.id), {
-          ...doctorPayload,
-          updated_at: serverTimestamp(),
-        })
+        await updateDoctor(editingDoctor.id, doctorPayload)
       } else {
-        await addDoc(collection(db, 'doctors'), {
-          ...doctorPayload,
-          is_active: true,
-          created_at: serverTimestamp(),
-          updated_at: serverTimestamp(),
-        })
+        await createDoctor(doctorPayload)
       }
 
-      await loadDoctors()
+      await loadDoctors(statusFilter)
       closeModal()
       showToast(editingDoctor ? 'Doctor updated successfully.' : 'Doctor added successfully.', 'success')
     } catch (saveError) {
@@ -130,12 +116,11 @@ function Doctors() {
     setTogglingId(doctor.id)
 
     try {
-      await updateDoc(doc(db, 'doctors', doctor.id), {
+      await updateDoctor(doctor.id, {
         is_active: !doctor.is_active,
-        updated_at: serverTimestamp(),
       })
 
-      await loadDoctors()
+      await loadDoctors(statusFilter)
       showToast('Doctor status updated.', 'success')
     } catch (toggleError) {
       showToast(toggleError.message || 'Unable to update doctor status.', 'error')
@@ -148,8 +133,8 @@ function Doctors() {
     if (!window.confirm('Delete this doctor?')) return
 
     try {
-      await deleteDoc(doc(db, 'doctors', doctorId))
-      await loadDoctors()
+      await deleteDoctor(doctorId)
+      await loadDoctors(statusFilter)
       showToast('Doctor deleted.', 'success')
     } catch (deleteError) {
       showToast(deleteError.message || 'Unable to delete doctor.', 'error')
@@ -177,6 +162,28 @@ function Doctors() {
             Add Doctor
           </button>
         </header>
+
+        <section className="flex items-center gap-2">
+          {[
+            { value: 'all', label: 'All' },
+            { value: 'active', label: 'Active' },
+            { value: 'inactive', label: 'Inactive' },
+          ].map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => setStatusFilter(option.value)}
+              aria-pressed={statusFilter === option.value}
+              className={`inline-flex items-center justify-center rounded-md border px-3 py-2 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 ${
+                statusFilter === option.value
+                  ? 'border-teal-600 bg-teal-600 text-white'
+                  : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              {option.label}
+            </button>
+          ))}
+        </section>
 
         <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
           {loading ? (
@@ -424,6 +431,17 @@ function Doctors() {
                   />
                 </div>
               </div>
+
+              <label className="flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-700">
+                <input
+                  type="checkbox"
+                  name="is_active"
+                  checked={Boolean(formData.is_active)}
+                  onChange={handleInputChange}
+                  className="h-4 w-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500"
+                />
+                Active
+              </label>
 
               <div className="flex flex-col-reverse gap-3 border-t border-slate-200 pt-5 sm:flex-row sm:justify-end">
                 <button

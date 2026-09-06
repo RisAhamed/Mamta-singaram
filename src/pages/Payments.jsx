@@ -1,10 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { db } from '../lib/firebase'
-import {
-  collection, getDocs, query, where,
-  doc, updateDoc, serverTimestamp
-} from 'firebase/firestore'
+import { getSessions, getPatient, updateSession } from '../lib/api'
 import { CheckCircle, IndianRupee } from 'lucide-react'
 import { useToast } from '../hooks/useToast'
 
@@ -20,38 +16,27 @@ function Payments() {
   const load = async () => {
     setLoading(true)
     try {
-      // STEP 1: Fetch only outstanding sessions using two targeted queries
-      // (Firestore cannot do OR on same field in a single query)
-      const [pendingSnap, partialSnap] = await Promise.all([
-        getDocs(query(collection(db, 'sessions'), where('payment_status', '==', 'Pending'))),
-        getDocs(query(collection(db, 'sessions'), where('payment_status', '==', 'Partial'))),
+      // STEP 1: Fetch outstanding sessions via API
+      const [pending, partial] = await Promise.all([
+        getSessions({ payment_status: 'Pending' }),
+        getSessions({ payment_status: 'Partial' }),
       ])
-      const outstandingSessions = [
-        ...pendingSnap.docs.map((d) => ({ id: d.id, ...d.data() })),
-        ...partialSnap.docs.map((d) => ({ id: d.id, ...d.data() })),
-      ]
+      const outstandingSessions = [...pending, ...partial]
 
-      // STEP 2: Collect all unique patient_ids and batch-fetch patients
+      // STEP 2: Batch-fetch patients via getPatient per id
       const patientIds = [...new Set(outstandingSessions.map((s) => s.patient_id).filter(Boolean))]
       const patientMap = {}
       if (patientIds.length > 0) {
-        const chunks = []
-        for (let i = 0; i < patientIds.length; i += 30) {
-          chunks.push(patientIds.slice(i, i + 30))
-        }
-        const patientSnaps = await Promise.all(
-          chunks.map((chunk) =>
-            getDocs(query(collection(db, 'patients'), where('__name__', 'in', chunk))),
-          ),
+        const patientResults = await Promise.all(
+          patientIds.map((id) => getPatient(id).catch(() => null)),
         )
-        patientSnaps.forEach((snap) => {
-          snap.docs.forEach((d) => {
-            patientMap[d.id] = d.data()
-          })
+        patientResults.forEach((p, idx) => {
+          const id = patientIds[idx]
+          if (p) patientMap[id] = p
         })
       }
 
-      // STEP 3: Enrich sessions from patientMap (no per-session reads)
+      // STEP 3: Enrich sessions from patientMap
       const enriched = outstandingSessions.map((s) => ({
         ...s,
         patient: patientMap[s.patient_id] || { full_name: 'Unknown', phone: '' },
@@ -94,10 +79,9 @@ function Payments() {
     const session = sessions.find(s => s.id === sessionId)
     if (!session) return
     try {
-      await updateDoc(doc(db, 'sessions', sessionId), {
+      await updateSession(sessionId, {
         amount_paid: session.treatment_cost,
         payment_status: 'Paid',
-        updated_at: serverTimestamp()
       })
       showToast('Marked as paid ✓', 'success')
       load() // reload the list — this session will disappear since it's now Paid

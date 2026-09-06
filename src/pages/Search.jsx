@@ -10,8 +10,7 @@ import {
 import { useNavigate } from 'react-router-dom'
 import Skeleton from '../components/Skeleton'
 import { useToast } from '../hooks/useToast'
-import { db } from '../lib/firebase'
-import { collection, getDocs } from 'firebase/firestore'
+import { getPatients, getSessions } from '../lib/api'
 
 function Search() {
   const navigate = useNavigate()
@@ -29,22 +28,12 @@ function Search() {
       setLoading(true)
 
       try {
-        const [patientsSnap, sessionsSnap] = await Promise.all([
-          getDocs(collection(db, 'patients')),
-          getDocs(collection(db, 'sessions')),
+        const [patientsData, sessionsData] = await Promise.all([
+          getPatients(),
+          getSessions(),
         ])
-        setAllPatients(
-          patientsSnap.docs.map((patientDoc) => ({
-            id: patientDoc.id,
-            ...patientDoc.data(),
-          })),
-        )
-        setAllSessions(
-          sessionsSnap.docs.map((sessionDoc) => ({
-            id: sessionDoc.id,
-            ...sessionDoc.data(),
-          })),
-        )
+        setAllPatients(patientsData)
+        setAllSessions(sessionsData)
       } catch (loadError) {
         showToast(loadError.message || 'Unable to load search data.', 'error')
       } finally {
@@ -283,7 +272,6 @@ function getLatestVisitByPatient(sessions) {
 
 function toDate(dateValue) {
   if (!dateValue) return null
-  if (dateValue?.toDate) return dateValue.toDate()
   const d = new Date(dateValue)
   return isNaN(d.getTime()) ? null : d
 }

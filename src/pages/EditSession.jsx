@@ -1,16 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  query,
-  serverTimestamp,
-  where,
-  writeBatch,
-} from 'firebase/firestore'
-import {
   Check,
   ExternalLink,
   Eye,
@@ -22,19 +12,22 @@ import {
   X,
 } from 'lucide-react'
 import { useToast } from '../hooks/useToast'
-import { db } from '../lib/firebase'
-import {
-  uploadSessionFile,
-  deleteSessionFile,
-  validateSessionFile,
-  formatFileSize,
-} from '../lib/sessionFiles'
 import { CONSULTATION_FORMS } from '../lib/consultationForms'
 import {
-  saveConsultationFormRecord,
-  getConsultationFormsForSession,
-  deleteConsultationFormRecord,
-} from '../lib/consultationFormRecords'
+  getSession,
+  getPatient,
+  getDoctors,
+  updateSession,
+  deleteSession,
+  getSessionFiles,
+  uploadSessionFile,
+  deleteSessionFile,
+  getConsultationForms,
+  createConsultationForm,
+  deleteConsultationForm,
+  validateSessionFile,
+  formatFileSize,
+} from '../lib/api'
 
 const emptyChartForm = {
   region: 'Upper Jaw',
@@ -116,14 +109,15 @@ function EditSession() {
   useEffect(() => {
     const loadAll = async () => {
       try {
-        const sessionSnap = await getDoc(doc(db, 'sessions', sessionId))
-        if (!sessionSnap.exists()) {
-          console.error('Session not found:', sessionId)
+        const sessionData = await getSession(sessionId)
+        const session = sessionData?.session ?? sessionData?.data ?? sessionData
+        if (!session || (!session.id && !session.patient_id)) {
+          console.error('Session not found:', sessionId, sessionData)
           setLoading(false)
           return
         }
 
-        const session = { id: sessionSnap.id, ...sessionSnap.data() }
+        const sid = session.id || sessionId
         setPatientId(session.patient_id)
         setVisitDate(formatInputDate(session.visit_date))
         setVisitType(session.visit_type || 'New')
@@ -132,63 +126,93 @@ function EditSession() {
         setTreatmentGiven(session.treatment_given || '')
         setInjectionGiven(session.injection_given || false)
         setInjectionDetails(session.injection_details || '')
-        setTreatmentCost(String(session.treatment_cost || ''))
-        setAmountPaid(String(session.amount_paid || ''))
+        setTreatmentCost(String(session.treatment_cost ?? ''))
+        setAmountPaid(String(session.amount_paid ?? ''))
         setPaymentStatus(session.payment_status || 'Pending')
         setNotes(session.notes || '')
         setNextVisitDate(formatInputDate(session.next_visit_date))
 
+        // Handle both nested vitals and flat columns
         if (session.vitals) {
-          setAge(session.vitals.age ? String(session.vitals.age) : '')
-          setWeight(session.vitals.weight ? String(session.vitals.weight) : '')
+          setAge(session.vitals.age != null ? String(session.vitals.age) : '')
+          setWeight(session.vitals.weight != null ? String(session.vitals.weight) : '')
           setBloodPressure(session.vitals.blood_pressure || '')
-          setBloodSugar(session.vitals.blood_sugar ? String(session.vitals.blood_sugar) : '')
-          setPulseRate(session.vitals.pulse_rate ? String(session.vitals.pulse_rate) : '')
-          setSpo2(session.vitals.spo2 ? String(session.vitals.spo2) : '')
+          setBloodSugar(session.vitals.blood_sugar != null ? String(session.vitals.blood_sugar) : '')
+          setPulseRate(session.vitals.pulse_rate != null ? String(session.vitals.pulse_rate) : '')
+          setSpo2(session.vitals.spo2 != null ? String(session.vitals.spo2) : '')
+        } else {
+          setAge(session.age != null ? String(session.age) : '')
+          setWeight(session.weight != null ? String(session.weight) : '')
+          setBloodPressure(session.blood_pressure || '')
+          setBloodSugar(session.blood_sugar != null ? String(session.blood_sugar) : '')
+          setPulseRate(session.pulse_rate != null ? String(session.pulse_rate) : '')
+          setSpo2(session.spo2 != null ? String(session.spo2) : '')
         }
 
-        const patientSnap = await getDoc(doc(db, 'patients', session.patient_id))
-        setPatientName(patientSnap.data()?.full_name || '')
+        // Patient name
+        try {
+          const patientRes = await getPatient(session.patient_id)
+          const p = patientRes?.patient ?? patientRes?.data ?? patientRes
+          setPatientName(p?.full_name || '')
+        } catch (e) {
+          console.error('Patient name load error:', e)
+        }
 
-        const [chartsSnap, doctorsSnap, allDoctorsSnap] = await Promise.all([
-          getDocs(
-            query(
-              collection(db, 'dental_chart_entries'),
-              where('session_id', '==', sessionId),
-            ),
-          ),
-          getDocs(
-            query(collection(db, 'session_doctors'), where('session_id', '==', sessionId)),
-          ),
-          getDocs(query(collection(db, 'doctors'), where('is_active', '==', true))),
-        ])
+        // Chart entries and doctors may be embedded in session response
+        const embeddedCharts = session.dental_chart_entries ?? session.chart_entries ?? session.chartEntries ?? null
+        const embeddedDoctors = session.doctors ?? session.session_doctors ?? null
 
-        setChartEntries(
-          chartsSnap.docs.map((chartDoc) => ({
-            id: chartDoc.id,
-            ...chartDoc.data(),
-            tempId: chartDoc.id,
-          })),
-        )
-        setSelectedDoctors(doctorsSnap.docs.map((doctorDoc) => doctorDoc.data().doctor_id))
-        setAllDoctors(
-          allDoctorsSnap.docs.map((doctorDoc) => ({
-            id: doctorDoc.id,
-            ...doctorDoc.data(),
-          })),
-        )
+        if (Array.isArray(embeddedCharts)) {
+          setChartEntries(
+            embeddedCharts.map((c) => ({
+              id: c.id,
+              tempId: c.id,
+              region: c.region,
+              tooth_number: c.tooth_number ?? null,
+              procedure_done: c.procedure_done,
+              notes: c.notes ?? null,
+            })),
+          )
+        }
+
+        if (Array.isArray(embeddedDoctors)) {
+          // doctors may be array of ids or objects with doctor_id/id
+          const ids = embeddedDoctors.map((d) => {
+            if (typeof d === 'string') return d
+            return d.doctor_id ?? d.id ?? d.doctorId
+          }).filter(Boolean)
+          setSelectedDoctors(ids)
+        }
+
+        // Load all active doctors
+        try {
+          const doctorsRes = await getDoctors(true)
+          const list = Array.isArray(doctorsRes) ? doctorsRes : (doctorsRes?.data ?? doctorsRes?.doctors ?? [])
+          setAllDoctors(list.map((d) => ({ id: d.id, ...d })))
+        } catch (e) {
+          console.error('Doctors load error:', e)
+        }
+
+        // If not embedded, chart entries / doctors are loaded via session already; otherwise fetch separately would duplicate.
+        // No separate fetch needed; backend handles transaction.
 
         // Load existing session files
-        const filesSnap = await getDocs(
-          query(collection(db, 'session_files'), where('session_id', '==', sessionId)),
-        )
-        setSessionFiles(
-          filesSnap.docs.map((fileDoc) => ({ id: fileDoc.id, ...fileDoc.data() })),
-        )
+        try {
+          const filesRes = await getSessionFiles(sid)
+          const filesList = Array.isArray(filesRes) ? filesRes : (filesRes?.data ?? filesRes?.files ?? [])
+          setSessionFiles(filesList.map((f) => ({ id: f.id, ...f })))
+        } catch (e) {
+          console.error('Session files load error:', e)
+        }
 
         // Load existing consultation form records
-        const consultationFormRecords = await getConsultationFormsForSession(sessionId)
-        setSavedConsultationForms(consultationFormRecords)
+        try {
+          const cfRes = await getConsultationForms(sid)
+          const cfList = Array.isArray(cfRes) ? cfRes : (cfRes?.data ?? cfRes?.consultation_forms ?? [])
+          setSavedConsultationForms(cfList)
+        } catch (e) {
+          console.error('Consultation forms load error:', e)
+        }
       } catch (loadError) {
         console.error('Session load error:', loadError)
         showToast(loadError.message || 'Unable to load session.', 'error')
@@ -301,88 +325,43 @@ function EditSession() {
     console.log('[EditSession] Update - chart entries:', entriesToSave.length)
 
     try {
-      // 1. Fetch existing entries to delete
-      const [oldCharts, oldDoctors] = await Promise.all([
-        getDocs(
-          query(collection(db, 'dental_chart_entries'), where('session_id', '==', sessionId)),
-        ),
-        getDocs(
-          query(collection(db, 'session_doctors'), where('session_id', '==', sessionId)),
-        ),
-      ])
-
-      // Guard: Firestore batch limits are 500 operations
-      const totalOperations = 1 + oldCharts.size + entriesToSave.length + oldDoctors.size + doctorsToSave.length
-      if (totalOperations > 450) {
-        window.alert('Too many dental chart entries or doctors. Please reduce the entries to update.')
-        return
-      }
-
-      const batch = writeBatch(db)
-
-      // 2. Add session update to batch
-      const sessionRef = doc(db, 'sessions', sessionId)
-      batch.update(sessionRef, {
+      const payload = {
         visit_date: visitDate,
         visit_type: visitType,
-        chief_complaint: chiefComplaint,
-        diagnosis,
-        treatment_given: treatmentGiven,
+        chief_complaint: chiefComplaint.trim(),
+        diagnosis: diagnosis.trim(),
+        treatment_given: treatmentGiven.trim(),
         injection_given: injectionGiven,
-        injection_details: injectionDetails,
+        injection_details: injectionGiven ? injectionDetails.trim() : '',
         treatment_cost: Math.round((Number.parseFloat(treatmentCost) || 0) * 100) / 100 || 0,
         amount_paid: Math.round((Number.parseFloat(amountPaid) || 0) * 100) / 100 || 0,
         payment_status: paymentStatus,
-        notes,
+        notes: notes.trim(),
         next_visit_date: nextVisitDate || null,
-        vitals: {
-          age: age ? parseInt(age) : null,
-          weight: weight ? parseFloat(weight) : null,
-          blood_pressure: bloodPressure.trim() || null,
-          blood_sugar: bloodSugar ? parseFloat(bloodSugar) : null,
-          pulse_rate: pulseRate ? parseInt(pulseRate) : null,
-          spo2: spo2 ? parseInt(spo2) : null,
-        },
-        updated_at: serverTimestamp(),
-      })
-
-      // 3. Add deletions of old entries to batch
-      oldCharts.docs.forEach((chartDoc) => batch.delete(chartDoc.ref))
-      oldDoctors.docs.forEach((doctorDoc) => batch.delete(doctorDoc.ref))
-
-      // 4. Add insertions of new entries to batch
-      entriesToSave.forEach((entry) => {
-        const entryRef = doc(collection(db, 'dental_chart_entries'))
-        batch.set(entryRef, {
-          session_id: sessionId,
-          patient_id: patientId,
+        age: age ? parseInt(age) : null,
+        weight: weight ? parseFloat(weight) : null,
+        blood_pressure: bloodPressure.trim() || null,
+        blood_sugar: bloodSugar ? parseFloat(bloodSugar) : null,
+        pulse_rate: pulseRate ? parseInt(pulseRate) : null,
+        spo2: spo2 ? parseInt(spo2) : null,
+        doctors: doctorsToSave,
+        chart_entries: entriesToSave.map((entry) => ({
           region: entry.region,
           tooth_number: entry.tooth_number || null,
           procedure_done: entry.procedure_done,
           notes: entry.notes || null,
-          created_at: serverTimestamp(),
-        })
-      })
+        })),
+      }
 
-      doctorsToSave.forEach((doctorId) => {
-        const docRef = doc(collection(db, 'session_doctors'))
-        batch.set(docRef, {
-          session_id: sessionId,
-          doctor_id: doctorId,
-          created_at: serverTimestamp(),
-        })
-      })
-
-      // 5. Commit atomic operation
-      await batch.commit()
-      console.log('[EditSession] Batch committed successfully')
+      await updateSession(sessionId, payload)
+      console.log('[EditSession] Session updated successfully via REST API')
 
       // Upload pending files if any are selected
       if (pendingFiles.length > 0) {
         try {
           setUploadingFile(true)
           const uploadResults = await Promise.allSettled(
-            pendingFiles.map((item) => uploadSessionFile(item.file, patientId, sessionId))
+            pendingFiles.map((item) => uploadSessionFile(sessionId, item.file))
           )
 
           const failedFiles = uploadResults
@@ -406,13 +385,10 @@ function EditSession() {
           setPendingFiles([])
           setFileErrors([])
 
-          // Reload documents from Firestore
-          const filesSnap = await getDocs(
-            query(collection(db, 'session_files'), where('session_id', '==', sessionId)),
-          )
-          setSessionFiles(
-            filesSnap.docs.map((fileDoc) => ({ id: fileDoc.id, ...fileDoc.data() })),
-          )
+          // Reload documents from backend
+          const filesRes = await getSessionFiles(sessionId)
+          const filesList = Array.isArray(filesRes) ? filesRes : (filesRes?.data ?? filesRes?.files ?? [])
+          setSessionFiles(filesList.map((f) => ({ id: f.id, ...f })))
         } catch (uploadErr) {
           console.error('File upload error:', uploadErr)
           showToast(
@@ -434,13 +410,10 @@ function EditSession() {
           for (let syncAttempt = 1; syncAttempt <= MAX_SYNC_ATTEMPTS; syncAttempt += 1) {
             const results = await Promise.allSettled(
               formsToUpload.map(async (item) => {
-                await saveConsultationFormRecord({
-                  sessionId,
-                  patientId,
-                  formId: item.formId,
-                  formLabel: item.formLabel,
-                  signatureUrl: null,
-                  storagePath: null,
+                await createConsultationForm(sessionId, {
+                  form_type: item.formId,
+                  form_label: item.formLabel,
+                  acknowledged: true,
                 })
               }),
             )
@@ -476,6 +449,13 @@ function EditSession() {
             )
             return
           }
+
+          // Refresh saved consultation forms list
+          try {
+            const cfRes = await getConsultationForms(sessionId)
+            const cfList = Array.isArray(cfRes) ? cfRes : (cfRes?.data ?? cfRes?.consultation_forms ?? [])
+            setSavedConsultationForms(cfList)
+          } catch {}
         } catch (cfErr) {
           console.error('Consultation form upload error:', cfErr)
           showToast(
@@ -502,20 +482,7 @@ function EditSession() {
     }
 
     try {
-      const [charts, doctors] = await Promise.all([
-        getDocs(
-          query(collection(db, 'dental_chart_entries'), where('session_id', '==', sessionId)),
-        ),
-        getDocs(query(collection(db, 'session_doctors'), where('session_id', '==', sessionId))),
-      ])
-
-      const batch = writeBatch(db)
-
-      charts.docs.forEach((chartDoc) => batch.delete(chartDoc.ref))
-      doctors.docs.forEach((doctorDoc) => batch.delete(doctorDoc.ref))
-      batch.delete(doc(db, 'sessions', sessionId))
-
-      await batch.commit()
+      await deleteSession(sessionId)
       showToast('Session deleted!', 'success')
       navigate(`/patients/${patientId}`)
     } catch (error) {
@@ -883,7 +850,7 @@ function EditSession() {
                         onClick={async () => {
                           try {
                             setDeletingConsultationId(record.id)
-                            await deleteConsultationFormRecord(record.id)
+                            await deleteConsultationForm(sessionId, record.id)
                             setSavedConsultationForms((prev) =>
                               prev.filter((r) => r.id !== record.id)
                             )
@@ -1233,7 +1200,7 @@ function EditSession() {
                                 onClick={async () => {
                                   try {
                                     setDeletingFileId(file.id)
-                                    await deleteSessionFile(file.id, file.storage_path)
+                                    await deleteSessionFile(file.id)
                                     setSessionFiles((prev) => prev.filter((f) => f.id !== file.id))
                                     showToast('File deleted', 'success')
                                   } catch (err) {

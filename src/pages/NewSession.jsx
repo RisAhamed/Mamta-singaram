@@ -14,20 +14,17 @@ import {
 } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useToast } from '../hooks/useToast'
-import { uploadSessionFile, validateSessionFile, formatFileSize } from '../lib/sessionFiles'
 import { CONSULTATION_FORMS } from '../lib/consultationForms'
-import { saveConsultationFormRecord } from '../lib/consultationFormRecords'
-import { db } from '../lib/firebase'
 import {
-  addDoc,
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  query,
-  serverTimestamp,
-  where,
-} from 'firebase/firestore'
+  getPatient,
+  getDoctors,
+  getSessions,
+  createSession,
+  uploadSessionFile,
+  validateSessionFile,
+  formatFileSize,
+  createConsultationForm,
+} from '../lib/api'
 
 
 const today = format(new Date(), 'yyyy-MM-dd')
@@ -164,10 +161,12 @@ function NewSession() {
       setLoading(true)
 
       try {
-        const snap = await getDoc(doc(db, 'patients', patientId))
-
-        if (snap.exists()) {
-          setPatient({ id: snap.id, ...snap.data() })
+        const data = await getPatient(patientId)
+        const raw = data?.patient ?? data?.data ?? data
+        if (raw && (raw.id || raw.patient_id || raw.full_name)) {
+          setPatient({ id: raw.id || patientId, ...raw })
+        } else if (raw) {
+          setPatient({ id: patientId, ...raw })
         } else {
           setPatient(null)
           console.error('No patient found for ID:', patientId)
@@ -187,10 +186,9 @@ function NewSession() {
   useEffect(() => {
     const loadDoctors = async () => {
       try {
-        const snap = await getDocs(
-          query(collection(db, 'doctors'), where('is_active', '==', true)),
-        )
-        setDoctors(snap.docs.map((doctorDoc) => ({ id: doctorDoc.id, ...doctorDoc.data() })))
+        const data = await getDoctors(true)
+        const list = Array.isArray(data) ? data : (data?.data ?? data?.doctors ?? [])
+        setDoctors(list.map((d) => ({ id: d.id, ...d })))
       } catch (error) {
         console.error('Doctors load error:', error)
         showToast(error.message || 'Unable to load doctors.', 'error')
@@ -206,15 +204,11 @@ function NewSession() {
       if (!patientId) return
 
       try {
-        const snap = await getDocs(
-          query(collection(db, 'sessions'), where('patient_id', '==', patientId)),
-        )
-        const rows = snap.docs.map((sessionDoc) => ({
-          id: sessionDoc.id,
-          ...sessionDoc.data(),
-        }))
+        const data = await getSessions({ patient_id: patientId })
+        const rows = Array.isArray(data) ? data : (data?.data ?? data?.sessions ?? [])
+        const mapped = rows.map((s) => ({ id: s.id, ...s }))
         setPreviousSessions(
-          rows.sort((a, b) => toMillis(b.visit_date) - toMillis(a.visit_date)),
+          mapped.sort((a, b) => toMillis(b.visit_date) - toMillis(a.visit_date)),
         )
       } catch (error) {
         console.error('Previous sessions load error:', error)
@@ -357,7 +351,7 @@ function NewSession() {
 
       // Create the session only once. If uploads fail, user can retry without duplicating the session.
       if (!targetSessionId) {
-        const sessionRef = await addDoc(collection(db, 'sessions'), {
+        const sessionData = {
           patient_id: currentPatientId,
           visit_date: formData.visit_date,
           visit_type: formData.visit_type,
@@ -379,46 +373,32 @@ function NewSession() {
           payment_status: paymentStatus,
           notes: formData.notes.trim(),
           next_visit_date: formData.next_visit_date || null,
-          vitals: {
-            age: age ? parseInt(age) : null,
-            weight: weight ? parseFloat(weight) : null,
-            blood_pressure: bloodPressure.trim() || null,
-            blood_sugar: bloodSugar ? parseFloat(bloodSugar) : null,
-            pulse_rate: pulseRate ? parseInt(pulseRate) : null,
-            spo2: spo2 ? parseInt(spo2) : null,
-          },
-          created_at: serverTimestamp(),
-          updated_at: serverTimestamp(),
-        })
+          age: age ? parseInt(age) : null,
+          weight: weight ? parseFloat(weight) : null,
+          blood_pressure: bloodPressure.trim() || null,
+          blood_sugar: bloodSugar ? parseFloat(bloodSugar) : null,
+          pulse_rate: pulseRate ? parseInt(pulseRate) : null,
+          spo2: spo2 ? parseInt(spo2) : null,
+          doctors: doctorsToSave,
+          chart_entries: entriesToSave.map((e) => ({
+            region: e.region,
+            tooth_number: e.tooth_number || null,
+            procedure_done: e.procedure_done,
+            notes: e.notes || null,
+          })),
+        }
 
-        targetSessionId = sessionRef.id
+        const created = await createSession(sessionData)
+        const newId = created?.id ?? created?.session_id ?? created?.data?.id ?? created?.data?.session_id
+        if (!newId) {
+          // Fallback: if backend returns the session directly with id field nested differently
+          const fallbackId = created?.session?.id ?? created?.result?.id
+          if (!fallbackId) throw new Error('Failed to create session: no id returned')
+          targetSessionId = fallbackId
+        } else {
+          targetSessionId = newId
+        }
         setCreatedSessionId(targetSessionId)
-
-        if (entriesToSave.length > 0) {
-          for (const entry of entriesToSave) {
-            await addDoc(collection(db, 'dental_chart_entries'), {
-              session_id: targetSessionId,
-              patient_id: currentPatientId,
-              region: entry.region,
-              tooth_number: entry.tooth_number || null,
-              procedure_done: entry.procedure_done,
-              notes: entry.notes || null,
-              created_at: serverTimestamp(),
-            })
-          }
-        }
-
-        if (doctorsToSave.length > 0) {
-          await Promise.all(
-            doctorsToSave.map((doctorId) =>
-              addDoc(collection(db, 'session_doctors'), {
-                session_id: targetSessionId,
-                doctor_id: doctorId,
-                created_at: serverTimestamp(),
-              }),
-            ),
-          )
-        }
       }
 
       // Upload attached files if any are selected
@@ -426,7 +406,7 @@ function NewSession() {
         try {
           setUploadingFile(true)
           const uploadResults = await Promise.allSettled(
-            pendingFiles.map((item) => uploadSessionFile(item.file, currentPatientId, targetSessionId))
+            pendingFiles.map((item) => uploadSessionFile(targetSessionId, item.file))
           )
 
           const failedFiles = uploadResults
@@ -472,13 +452,10 @@ function NewSession() {
           for (let syncAttempt = 1; syncAttempt <= MAX_SYNC_ATTEMPTS; syncAttempt += 1) {
             const results = await Promise.allSettled(
               formsToUpload.map(async (item) => {
-                await saveConsultationFormRecord({
-                  sessionId: targetSessionId,
-                  patientId: currentPatientId,
-                  formId: item.formId,
-                  formLabel: item.formLabel,
-                  signatureUrl: null,
-                  storagePath: null,
+                await createConsultationForm(targetSessionId, {
+                  form_type: item.formId,
+                  form_label: item.formLabel,
+                  acknowledged: true,
                 })
               }),
             )

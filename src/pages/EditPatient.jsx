@@ -2,8 +2,7 @@ import { useEffect, useState } from 'react'
 import { Loader2, Save, X } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useToast } from '../hooks/useToast'
-import { db } from '../lib/firebase'
-import { doc, getDoc, serverTimestamp, updateDoc } from 'firebase/firestore'
+import { getPatient, updatePatient } from '../lib/api'
 
 const emptyForm = {
   full_name: '',
@@ -46,10 +45,8 @@ function EditPatient() {
       setLoading(true)
 
       try {
-        const snap = await getDoc(doc(db, 'patients', patientId))
-        if (!snap.exists()) return
-
-        const data = snap.data()
+        const data = await getPatient(patientId)
+        if (!data) return
 
         setForm({
           full_name: data.full_name || '',
@@ -124,10 +121,9 @@ function EditPatient() {
         pulse_rate: pulseRate ? parseInt(pulseRate) : null,
         spo2: spo2 ? parseInt(spo2) : null,
         notes: form.notes.trim() || null,
-        updated_at: serverTimestamp(),
       }
 
-      await updateDoc(doc(db, 'patients', patientId), payload)
+      await updatePatient(patientId, payload)
 
       showToast('Patient updated successfully.', 'success')
       navigate(`/patients/${patientId}`)

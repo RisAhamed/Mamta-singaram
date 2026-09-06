@@ -3,16 +3,7 @@ import { Loader2, Plus, Search, User, Users } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import Skeleton from '../components/Skeleton'
 import { useToast } from '../hooks/useToast'
-import { db } from '../lib/firebase'
-import {
-  addDoc,
-  collection,
-  getCountFromServer,
-  getDocs,
-  orderBy,
-  query,
-  serverTimestamp,
-} from 'firebase/firestore'
+import { getPatients, createPatient } from '../lib/api'
 
 const emptyForm = {
   full_name: '',
@@ -29,6 +20,7 @@ const emptyForm = {
   medical_conditions: '',
   current_medications: '',
   previous_dental_history: '',
+  registration_date: '',
 }
 
 const genderOptions = ['Male', 'Female', 'Other']
@@ -56,10 +48,9 @@ function Patients() {
     setLoading(true)
 
     try {
-      const snap = await getDocs(
-        query(collection(db, 'patients'), orderBy('created_at', 'desc')),
-      )
-      setPatients(snap.docs.map((patient) => ({ id: patient.id, ...patient.data() })))
+      const data = await getPatients()
+      const list = Array.isArray(data) ? data : (data?.data ?? data?.patients ?? [])
+      setPatients(list)
     } catch (fetchError) {
       showToast(fetchError.message || 'Unable to load patients.', 'error')
     } finally {
@@ -121,15 +112,6 @@ function Patients() {
     setFormData((current) => ({ ...current, [name]: value }))
   }
 
-  const generatePatientId = async () => {
-    const countSnap = await getCountFromServer(collection(db, 'patients'))
-    const count = countSnap.data().count + 1
-    const year = new Date().getFullYear()
-    const suffix = Math.random().toString(36).substring(2, 6).toUpperCase()
-    return `DC-${year}-${String(count).padStart(4, '0')}-${suffix}`
-    // Example output: DC-2026-0043-X7K2
-  }
-
   const handleSubmit = async (event) => {
     event.preventDefault()
 
@@ -141,37 +123,33 @@ function Patients() {
     setSaving(true)
 
     try {
-      const patientId = await generatePatientId()
       const payload = {
-        patient_id: patientId,
         full_name: formData.full_name.trim(),
         registration_date: formData.registration_date || null,
         date_of_birth: formData.dob || null,
         dob: formData.dob || null,
         gender: formData.gender || null,
         phone: formData.phone.trim(),
-        email: formData.email.trim() || '',
-        address: formData.address.trim() || '',
-        blood_group: formData.blood_group || '',
-        allergies: formData.allergies.trim() || '',
-        medical_history: formData.medical_history.trim() || '',
-        medical_conditions: formData.medical_conditions.trim() || '',
-        current_medications: formData.current_medications.trim() || '',
-        previous_dental_history: formData.previous_dental_history.trim() || '',
-        emergency_contact_name: formData.emergency_contact_name.trim() || '',
-        emergency_contact_phone: formData.emergency_contact_phone.trim() || '',
+        email: formData.email.trim() || null,
+        address: formData.address.trim() || null,
+        blood_group: formData.blood_group || null,
+        allergies: formData.allergies.trim() || null,
+        medical_history: formData.medical_history.trim() || null,
+        medical_conditions: formData.medical_conditions.trim() || null,
+        current_medications: formData.current_medications.trim() || null,
+        previous_dental_history: formData.previous_dental_history.trim() || null,
+        emergency_contact_name: formData.emergency_contact_name.trim() || null,
+        emergency_contact_phone: formData.emergency_contact_phone.trim() || null,
         age: age ? parseInt(age) : null,
         weight: weight ? parseFloat(weight) : null,
         blood_pressure: bloodPressure.trim() || null,
         blood_sugar: bloodSugar ? parseFloat(bloodSugar) : null,
         pulse_rate: pulseRate ? parseInt(pulseRate) : null,
         spo2: spo2 ? parseInt(spo2) : null,
-        notes: '',
-        created_at: serverTimestamp(),
-        updated_at: serverTimestamp(),
+        notes: null,
       }
 
-      await addDoc(collection(db, 'patients'), payload)
+      await createPatient(payload)
 
       await loadPatients()
       closeModal()
@@ -457,6 +435,42 @@ function Patients() {
                     onChange={handleInputChange}
                     className="mt-1 block w-full resize-y rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-950 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20"
                     placeholder="Relevant medical history"
+                  />
+                </Field>
+
+                <Field label="Medical Conditions" name="medical_conditions">
+                  <textarea
+                    id="medical_conditions"
+                    name="medical_conditions"
+                    rows="3"
+                    value={formData.medical_conditions}
+                    onChange={handleInputChange}
+                    className="mt-1 block w-full resize-y rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-950 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20"
+                    placeholder="Chronic or current conditions"
+                  />
+                </Field>
+
+                <Field label="Current Medications" name="current_medications">
+                  <textarea
+                    id="current_medications"
+                    name="current_medications"
+                    rows="3"
+                    value={formData.current_medications}
+                    onChange={handleInputChange}
+                    className="mt-1 block w-full resize-y rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-950 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20"
+                    placeholder="Medicines currently taken"
+                  />
+                </Field>
+
+                <Field label="Previous Dental History" name="previous_dental_history" className="sm:col-span-2">
+                  <textarea
+                    id="previous_dental_history"
+                    name="previous_dental_history"
+                    rows="3"
+                    value={formData.previous_dental_history}
+                    onChange={handleInputChange}
+                    className="mt-1 block w-full resize-y rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-950 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20"
+                    placeholder="Past dental treatments or procedures"
                   />
                 </Field>
 

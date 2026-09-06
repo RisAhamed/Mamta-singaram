@@ -8,8 +8,7 @@ import {
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useToast } from '../hooks/useToast'
-import { db } from '../lib/firebase'
-import { collection, getDocs, getCountFromServer, query, where, orderBy, limit } from 'firebase/firestore'
+import { getPatients, getPatient, getSessions } from '../lib/api'
 
 const initialStats = {
   totalPatients: 0,
@@ -44,77 +43,68 @@ function Dashboard() {
           .toISOString()
           .split('T')[0]
 
-        // 1. Total patients — server-side count (no document downloads)
-        const countSnap = await getCountFromServer(collection(db, 'patients'))
-        const totalPatients = countSnap.data().count
+        // 1. Total patients & recent patients — from single getPatients call
+        const allPatients = await getPatients()
+        const totalPatients = allPatients.length
 
-        // 2. Sessions this month — targeted query
-        const monthSnap = await getDocs(
-          query(collection(db, 'sessions'), where('visit_date', '>=', monthStart)),
-        )
-        const sessionsThisMonth = monthSnap.size
+        // 2. Sessions this month — backend filter on visit_date
+        const monthSessions = await getSessions({ visit_date_from: monthStart })
+        const sessionsThisMonth = monthSessions.length
 
-        // 3. Today's appointments — targeted query
-        const todaySnap = await getDocs(
-          query(collection(db, 'sessions'), where('next_visit_date', '==', today)),
-        )
-        const todayAppointments = todaySnap.size
+        // 3. All sessions — used to derive today's appointments and upcoming
+        //    Backend getSessions filters on visit_date, not next_visit_date, so filter client side
+        const allSessions = await getSessions()
+        const todayAppointments = allSessions.filter(
+          (s) => normalizeDateValue(s.next_visit_date) === today,
+        ).length
 
-        // 4. Pending dues — two separate queries (Firestore cannot do OR on same field)
-        const [pendingSnap, partialSnap] = await Promise.all([
-          getDocs(query(collection(db, 'sessions'), where('payment_status', '==', 'Pending'))),
-          getDocs(query(collection(db, 'sessions'), where('payment_status', '==', 'Partial'))),
+        // 4. Pending dues — two queries merged
+        const [pending, partial] = await Promise.all([
+          getSessions({ payment_status: 'Pending' }),
+          getSessions({ payment_status: 'Partial' }),
         ])
-        const pendingSessions = [...pendingSnap.docs, ...partialSnap.docs].map((d) => ({
-          id: d.id,
-          ...d.data(),
-        }))
+        const pendingSessions = [...pending, ...partial]
         const pendingAmount = pendingSessions.reduce(
           (sum, s) => sum + Number(s.treatment_cost || 0) - Number(s.amount_paid || 0),
           0,
         )
 
-        // 5. Upcoming appointments — targeted query for next 7 days, server-sorted + limited
-        const upcomingSnap = await getDocs(
-          query(
-            collection(db, 'sessions'),
-            where('next_visit_date', '>=', today),
-            where('next_visit_date', '<=', nextWeek),
-            orderBy('next_visit_date', 'asc'),
-            limit(10),
-          ),
-        )
-        const upcoming = upcomingSnap.docs.map((d) => ({ id: d.id, ...d.data() }))
+        // 5. Upcoming appointments — filter next_visit_date between today and nextWeek, sort, limit 10
+        const upcoming = allSessions
+          .filter((s) => {
+            const nvd = normalizeDateValue(s.next_visit_date)
+            return nvd && nvd >= today && nvd <= nextWeek
+          })
+          .sort((a, b) => normalizeDateValue(a.next_visit_date).localeCompare(normalizeDateValue(b.next_visit_date)))
+          .slice(0, 10)
 
-        // 6. Batch patient lookup — replaces N+1 individual getDoc calls
+        // 6. Batch patient lookup via getPatient per id
         const patientIds = [...new Set(upcoming.map((s) => s.patient_id).filter(Boolean))]
-        const chunkArray = (arr, size) =>
-          arr.reduce(
-            (chunks, item, i) =>
-              i % size === 0
-                ? [...chunks, [item]]
-                : [...chunks.slice(0, -1), [...chunks.slice(-1)[0], item]],
-            [],
-          )
-        const chunks = patientIds.length > 0 ? chunkArray(patientIds, 30) : []
-        const patientDocs = (
-          await Promise.all(
-            chunks.map((chunk) =>
-              getDocs(query(collection(db, 'patients'), where('__name__', 'in', chunk))),
-            ),
-          )
-        ).flatMap((snap) => snap.docs)
-        const patientMap = Object.fromEntries(patientDocs.map((d) => [d.id, d.data()]))
+        const patientResults = await Promise.all(
+          patientIds.map((id) => getPatient(id).catch(() => null)),
+        )
+        const patientMap = {}
+        patientResults.forEach((p) => {
+          if (p && p.id) patientMap[p.id] = p
+          else if (p && p.patient_id) patientMap[p.id || p.patient_id] = p
+        })
+        // Fallback: some APIs return patient with id field, ensure map keyed correctly
+        // Re-map using requested ids order if response id differs
+        patientIds.forEach((id, idx) => {
+          const res = patientResults[idx]
+          if (res && !patientMap[id] && res.id) {
+            patientMap[id] = res
+          }
+        })
         const upcomingWithPatients = upcoming.map((session) => {
           const patient = patientMap[session.patient_id] || null
           return { ...session, patient, patients: patient }
         })
 
-        // 7. Recent patients — server-side sort + limit (no full collection download)
-        const recentSnap = await getDocs(
-          query(collection(db, 'patients'), orderBy('created_at', 'desc'), limit(5)),
-        )
-        const recentPatients = recentSnap.docs.map((d) => ({ id: d.id, ...d.data() }))
+        // 7. Recent patients — sort by created_at desc, limit 5
+        const recentPatients = [...allPatients]
+          .sort((a, b) => toMillis(b.created_at) - toMillis(a.created_at))
+          .slice(0, 5)
 
         setStats({
           totalPatients,
@@ -314,13 +304,11 @@ function formatDate(dateValue) {
 
 function normalizeDateValue(dateValue) {
   if (!dateValue) return ''
-  if (dateValue?.toDate) return dateValue.toDate().toISOString().split('T')[0]
   return String(dateValue).split('T')[0]
 }
 
 function toDate(dateValue) {
   if (!dateValue) return null
-  if (dateValue?.toDate) return dateValue.toDate()
   const d = new Date(dateValue)
   return isNaN(d.getTime()) ? null : d
 }

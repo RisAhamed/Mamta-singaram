@@ -11,17 +11,13 @@ import {
 import { useNavigate, useParams } from 'react-router-dom'
 import SessionCard from '../components/SessionCard'
 import { useToast } from '../hooks/useToast'
-import { db } from '../lib/firebase'
 import {
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  orderBy,
-  query,
-  where,
-} from 'firebase/firestore'
-import { getConsultationFormsForSession } from '../lib/consultationFormRecords'
+  getPatient,
+  getSessions,
+  getSession,
+  getSessionFiles,
+  getConsultationForms,
+} from '../lib/api'
 
 const filterOptions = [
   { label: '3M', value: '3M' },
@@ -47,116 +43,92 @@ function PatientDetail() {
       try {
         setLoading(true)
 
-        const patientSnap = await getDoc(doc(db, 'patients', patientId))
-
-        if (!patientSnap.exists()) {
-          console.error('Patient not found:', patientId)
-          setPatient(null)
-          setSessions([])
-          setFollowupSessions({})
-          setLoading(false)
-          return
+        let patientData
+        try {
+          const patientRaw = await getPatient(patientId)
+          if (!patientRaw) {
+            setPatient(null)
+            setSessions([])
+            setFollowupSessions({})
+            setLoading(false)
+            return
+          }
+          patientData = normalizeFirestoreData(patientRaw)
+        } catch (patientErr) {
+          const msg = patientErr?.message || ''
+          if (msg.toLowerCase().includes('not found') || msg.includes('404')) {
+            console.error('Patient not found:', patientId)
+            setPatient(null)
+            setSessions([])
+            setFollowupSessions({})
+            setLoading(false)
+            return
+          }
+          throw patientErr
         }
-
-        const patientData = normalizeFirestoreData({
-          id: patientSnap.id,
-          ...patientSnap.data(),
-        })
         setPatient(patientData)
 
-        const sessionsSnap = await getDocs(
-          query(
-            collection(db, 'sessions'),
-            where('patient_id', '==', patientId),
-            orderBy('visit_date', 'desc'),
-          ),
-        )
-        const sessionsRaw = sessionsSnap.docs.map((sessionDoc) =>
-          normalizeFirestoreData({
-            id: sessionDoc.id,
-            ...sessionDoc.data(),
-          }),
+        const sessionsRawResponse = await getSessions({ patient_id: patientId })
+        const sessionsRawArray = Array.isArray(sessionsRawResponse)
+          ? sessionsRawResponse
+          : Array.isArray(sessionsRawResponse?.rows)
+            ? sessionsRawResponse.rows
+            : Array.isArray(sessionsRawResponse?.data)
+              ? sessionsRawResponse.data
+              : []
+        const sessionsRaw = sessionsRawArray.map((session) =>
+          normalizeFirestoreData(session),
         )
 
-        // Step 1: Fetch all session_doctors across all sessions in parallel and collect unique doctor_ids
-        const allSessionDoctorSnaps = await Promise.all(
-          sessionsRaw.map((session) =>
-            getDocs(query(collection(db, 'session_doctors'), where('session_id', '==', session.id))),
-          ),
-        )
-
-        const allDoctorIds = [
-          ...new Set(
-            allSessionDoctorSnaps.flatMap((snap) =>
-              snap.docs.map((d) => d.data().doctor_id).filter(Boolean),
-            ),
-          ),
-        ]
-
-        // Step 2: Batch fetch all doctor documents in one query using __name__ in
-        const doctorMap = {}
-        if (allDoctorIds.length > 0) {
-          const chunks = []
-          for (let i = 0; i < allDoctorIds.length; i += 30) {
-            chunks.push(allDoctorIds.slice(i, i + 30))
-          }
-          const doctorSnaps = await Promise.all(
-            chunks.map((chunk) =>
-              getDocs(query(collection(db, 'doctors'), where('__name__', 'in', chunk))),
-            ),
-          )
-          doctorSnaps.forEach((snap) => {
-            snap.docs.forEach((d) => {
-              doctorMap[d.id] = normalizeFirestoreData({ id: d.id, ...d.data() })
-            })
-          })
-        }
-
-        // Step 3: When building sessionsWithDetails, use doctorMap instead of getDoc
+        // Enrich each session with doctors + chart entries via getSession, plus files and consultation forms
         const sessionsWithDetails = await Promise.all(
-          sessionsRaw.map(async (session, sessionIndex) => {
-            const [chartsSnap, filesSnap, consultationFormRecords] = await Promise.all([
-              getDocs(
-                query(
-                  collection(db, 'dental_chart_entries'),
-                  where('session_id', '==', session.id),
-                ),
-              ),
-              getDocs(
-                query(
-                  collection(db, 'session_files'),
-                  where('session_id', '==', session.id),
-                ),
-              ),
-              getConsultationFormsForSession(session.id),
+          sessionsRaw.map(async (session) => {
+            const [enriched, filesRaw, consultationFormRecordsRaw] = await Promise.all([
+              getSession(session.id).catch(() => null),
+              getSessionFiles(session.id).catch(() => []),
+              getConsultationForms(session.id).catch(() => []),
             ])
 
-            const chartEntries = chartsSnap.docs.map((chartDoc) =>
-              normalizeFirestoreData({
-                id: chartDoc.id,
-                ...chartDoc.data(),
-              }),
-            )
+            // enriched contains doctors and dental_chart_entries
+            const doctors = enriched?.doctors
+              ? enriched.doctors.map((d) => normalizeFirestoreData(d))
+              : []
 
-            const files = filesSnap.docs.map((fileDoc) =>
-              normalizeFirestoreData({
-                id: fileDoc.id,
-                ...fileDoc.data(),
-              }),
-            )
+            const dentalEntriesRaw = enriched?.dental_chart_entries || enriched?.chart_entries || []
+            const chartEntries = Array.isArray(dentalEntriesRaw)
+              ? dentalEntriesRaw.map((chartDoc) => normalizeFirestoreData(chartDoc))
+              : []
 
-            const consultationForms = consultationFormRecords.map((record) =>
-              normalizeFirestoreData(record),
-            )
+            const filesArray = Array.isArray(filesRaw)
+              ? filesRaw
+              : Array.isArray(filesRaw?.rows)
+                ? filesRaw.rows
+                : Array.isArray(filesRaw?.data)
+                  ? filesRaw.data
+                  : []
+            const files = filesArray.map((fileDoc) => normalizeFirestoreData(fileDoc))
 
-            const doctorDetails = allSessionDoctorSnaps[sessionIndex].docs
-              .map((doctorDoc) => doctorMap[doctorDoc.data().doctor_id] || null)
-              .filter(Boolean)
+            const formsArray = Array.isArray(consultationFormRecordsRaw)
+              ? consultationFormRecordsRaw
+              : Array.isArray(consultationFormRecordsRaw?.rows)
+                ? consultationFormRecordsRaw.rows
+                : Array.isArray(consultationFormRecordsRaw?.data)
+                  ? consultationFormRecordsRaw.data
+                  : []
+            const consultationForms = formsArray.map((record) => normalizeFirestoreData(record))
+
+            // Merge enriched base fields (visit_date etc) without overwriting our computed arrays
+            const enrichedBase = enriched ? normalizeFirestoreData(enriched) : {}
+            // Remove nested keys from enrichedBase to avoid confusion
+            // eslint-disable-next-line no-unused-vars
+            const { doctors: _d, dental_chart_entries: _dce, chart_entries: _ce, ...enrichedRest } = enrichedBase
 
             return {
               ...session,
+              ...enrichedRest,
+              id: session.id,
               chartEntries,
-              doctors: doctorDetails,
+              doctors,
               files,
               consultationForms,
             }
@@ -529,6 +501,7 @@ function toDate(dateValue) {
 }
 
 function normalizeFirestoreData(data) {
+  if (!data || typeof data !== 'object') return data
   return Object.fromEntries(
     Object.entries(data).map(([key, value]) => [
       key,
@@ -554,20 +527,11 @@ async function buildFollowupSessions(sessionRows) {
 
   if (followupIds.length === 0) return visibleFollowups
 
-  // Batch fetch all missing followup sessions in one query instead of N getDoc calls
-  const chunks = []
-  for (let i = 0; i < followupIds.length; i += 30) {
-    chunks.push(followupIds.slice(i, i + 30))
-  }
-  const snaps = await Promise.all(
-    chunks.map((chunk) =>
-      getDocs(query(collection(db, 'sessions'), where('__name__', 'in', chunk))),
-    ),
+  const fetched = await Promise.all(
+    followupIds.map((id) => getSession(id).catch(() => null)),
   )
 
-  const fetchedFollowups = snaps
-    .flatMap((snap) => snap.docs)
-    .map((d) => ({ id: d.id, ...d.data() }))
+  const fetchedFollowups = fetched.filter(Boolean).map((s) => normalizeFirestoreData(s))
 
   return {
     ...visibleFollowups,

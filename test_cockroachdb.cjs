@@ -1,16 +1,14 @@
 const { Client } = require('pg');
 const fs = require('fs');
 const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '.env') });
 
 const certPath = path.join(process.env.APPDATA, 'postgresql', 'root.crt');
-const caCert = fs.readFileSync(certPath);
+const repoCertPath = path.join(__dirname, 'root.crt');
+const caCert = fs.existsSync(repoCertPath) ? fs.readFileSync(repoCertPath) : fs.readFileSync(certPath);
 
 const client = new Client({
-  host: 'mamta-singaram-33381.j77.aws-ap-south-1.cockroachlabs.cloud',
-  port: 26257,
-  database: 'defaultdb',
-  user: 'riswan',
-  password: process.env.COCKROACH_DB_PASSWORD || 'sPsrGxcwQYsFvWTJmrsj1Q',
+  connectionString: process.env.DATABASE_URL,
   ssl: {
     ca: caCert,
     rejectUnauthorized: true
