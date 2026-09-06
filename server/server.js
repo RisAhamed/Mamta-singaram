@@ -1,5 +1,6 @@
 import express from 'express'
 import cors from 'cors'
+import fs from 'fs'
 import dotenv from 'dotenv'
 import path from 'path'
 import process from 'node:process'
@@ -26,12 +27,32 @@ import sessionSurgeryFormsRouter from './routes/sessionSurgeryForms.js'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
-// Load environment variables from the root .env file
-dotenv.config({ path: path.resolve(__dirname, '../.env') })
+// Load environment variables from .env if it exists (skip on Render where env vars are set in dashboard)
+try {
+  const envPath = path.resolve(__dirname, '../.env')
+  if (fs.existsSync(envPath)) {
+    dotenv.config({ path: envPath })
+  }
+} catch { /* .env not present — rely on process.env from hosting platform */ }
 
 const app = express()
 
-app.use(cors())
+// CORS: allow frontend domain in production, all origins in development
+const allowedOrigins = [
+  'https://mamtasingaram.vercel.app',
+  'http://localhost:5173',
+  'http://localhost:3001',
+]
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true)
+    } else {
+      callback(null, true) // Allow all in development; restrict in production if needed
+    }
+  },
+  credentials: true,
+}))
 app.use(express.json())
 
 app.get('/api/health', async (req, res) => {

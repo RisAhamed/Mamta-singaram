@@ -1,12 +1,21 @@
 import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
+import fs from 'fs'
 import dotenv from 'dotenv'
 import path from 'path'
+import process from 'node:process'
 import { fileURLToPath } from 'url'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
-dotenv.config({ path: path.resolve(__dirname, '../.env') })
+
+// Load environment variables from .env if it exists (skip on Render where env vars are set in dashboard)
+try {
+  const envPath = path.resolve(__dirname, '../.env')
+  if (fs.existsSync(envPath)) {
+    dotenv.config({ path: envPath })
+  }
+} catch { /* .env not present — rely on process.env from hosting platform */ }
 
 function envTrim(name) {
   const v = process.env[name]
