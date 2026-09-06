@@ -5,7 +5,6 @@ import {
   ChevronDown,
   FileText,
   Loader2,
-  Paperclip,
   Plus,
   Save,
   Syringe,
@@ -15,14 +14,12 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useToast } from '../hooks/useToast'
 import { CONSULTATION_FORMS } from '../lib/consultationForms'
 import MasterSelect from '../components/MasterSelect'
+import FileUpload from '../components/FileUpload'
 import {
   getPatient,
   getDoctors,
   getSessions,
   createSession,
-  uploadSessionFile,
-  validateSessionFile,
-  formatFileSize,
   createConsultationForm,
   getLocations,
   createLocation,
@@ -99,9 +96,7 @@ function NewSession() {
   const [saving, setSaving] = useState(false)
   const [createdSessionId, setCreatedSessionId] = useState(null)
 
-  const [pendingFiles, setPendingFiles] = useState([])
-  const [fileErrors, setFileErrors] = useState([])
-  const [uploadingFile, setUploadingFile] = useState(false)
+  const fileUploadRef = useRef(null)
 
   const [age, setAge] = useState('')
   const [weight, setWeight] = useState('')
@@ -296,54 +291,6 @@ function NewSession() {
   }
 
 
-  const handleFilesSelected = (event) => {
-    const incomingFiles = Array.from(event.target.files || [])
-    if (!incomingFiles.length) return
-
-    const nextValid = []
-    const nextErrors = []
-
-    incomingFiles.forEach((file) => {
-      // Check for duplicate in pendingFiles
-      const isDuplicate = pendingFiles.some(
-        (item) => item.name === file.name && item.size === file.size && item.type === file.type
-      )
-      if (isDuplicate) {
-        nextErrors.push(`${file.name}: already added`)
-        return
-      }
-
-      const result = validateSessionFile(file)
-      if (result.valid) {
-        nextValid.push({
-          id: `${file.name}-${file.size}-${Date.now()}-${Math.random()}`,
-          file,
-          name: file.name,
-          size: file.size,
-          type: file.type,
-        })
-      } else {
-        nextErrors.push(`${file.name}: ${result.message}`)
-      }
-    })
-
-    if (nextValid.length > 0) {
-      setPendingFiles((prev) => [...prev, ...nextValid])
-    }
-
-    if (nextErrors.length > 0) {
-      setFileErrors(nextErrors)
-    } else {
-      setFileErrors([])
-    }
-
-    event.target.value = ''
-  }
-
-  const removePendingFile = (fileId) => {
-    setPendingFiles((prev) => prev.filter((item) => item.id !== fileId))
-  }
-
 
   const handleSave = async (event) => {
     event.preventDefault()
@@ -359,7 +306,7 @@ function NewSession() {
       showToast('Next Appointment Date is required.', 'warning')
       return
     }
-    if (pendingFiles.length === 0) {
+    if (fileUploadRef.current && !fileUploadRef.current.hasPending()) {
       showToast('Upload Photos is required — please add at least one photo/document.', 'warning')
       return
     }
@@ -431,35 +378,17 @@ function NewSession() {
       }
 
       // Upload attached files if any are selected
-      if (pendingFiles.length > 0) {
+      if (fileUploadRef.current && fileUploadRef.current.hasPending()) {
         try {
-          setUploadingFile(true)
-          const uploadResults = await Promise.allSettled(
-            pendingFiles.map((item) => uploadSessionFile(targetSessionId, item.file))
-          )
+          const { success } = await fileUploadRef.current.uploadAll(targetSessionId)
 
-          const failedFiles = uploadResults
-            .map((result, index) => ({ result, item: pendingFiles[index] }))
-            .filter(({ result }) => result.status === 'rejected')
-            .map(({ item, result }) => ({
-              ...item,
-              uploadError: result.reason?.message || 'Upload failed',
-            }))
-
-          if (failedFiles.length > 0) {
-            setPendingFiles(failedFiles)
-            setFileErrors(
-              failedFiles.map((item) => `${item.name}: ${item.uploadError}`),
-            )
+          if (!success) {
             showToast(
               'Session saved, but some document uploads failed. Click Save Session again to retry failed uploads.',
               'warning',
             )
             return
           }
-
-          setPendingFiles([])
-          setFileErrors([])
         } catch (uploadErr) {
           console.error('File upload error:', uploadErr)
           showToast(
@@ -467,8 +396,6 @@ function NewSession() {
             'warning',
           )
           return
-        } finally {
-          setUploadingFile(false)
         }
       }
 
@@ -1142,65 +1069,7 @@ function NewSession() {
 
         {/* ── Section 8 — Upload Photos (mandatory) ─────────────────────────────────── */}
         <Section title="Upload Photos">
-          <div className="space-y-3">
-            <p className="text-xs text-slate-500">
-              <span className="text-rose-600">*</span> Required — at least one photo/document is required for new sessions. Allowed: PDF/JPG/PNG. Maximum file size: 0.5 MB per file. You can add multiple files. <span className="hidden sm:inline">On iPhone, tap to take a photo or choose from library.</span>
-            </p>
-            <input
-              type="file"
-              multiple
-              accept="image/*,application/pdf,.pdf,.jpg,.jpeg,.png"
-              onChange={handleFilesSelected}
-              className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-md file:border file:border-slate-300 file:bg-white file:px-3 file:py-2 file:text-sm file:font-medium file:text-slate-700 file:transition hover:file:bg-slate-50"
-            />
-            {fileErrors.length > 0 && (
-              <div className="space-y-1">
-                {fileErrors.map((err, idx) => (
-                  <p key={idx} className="text-xs text-red-600 font-medium">⚠️ {err}</p>
-                ))}
-              </div>
-            )}
-            {pendingFiles.length > 0 && (
-              <div className="space-y-2 pt-2">
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
-                  Pending uploads ({pendingFiles.length})
-                </p>
-                <div className="space-y-1.5">
-                  {pendingFiles.map((item) => (
-                    <div
-                      key={item.id}
-                      className="flex items-center justify-between gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2"
-                    >
-                      <div className="min-w-0 flex-1 flex items-center gap-2">
-                        <Paperclip className="h-4 w-4 text-teal-600 shrink-0" />
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-medium text-slate-700">
-                            {item.name}
-                          </p>
-                          <p className="text-xs text-slate-400">
-                            {formatFileSize(item.size)}
-                          </p>
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => removePendingFile(item.id)}
-                        className="inline-flex items-center gap-1 rounded border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-600 transition hover:bg-slate-50"
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-            {uploadingFile && (
-              <div className="flex items-center gap-2 text-sm text-slate-500">
-                <Loader2 className="h-4 w-4 animate-spin text-teal-600" />
-                Uploading documents…
-              </div>
-            )}
-          </div>
+          <FileUpload ref={fileUploadRef} required />
         </Section>
 
       </form>

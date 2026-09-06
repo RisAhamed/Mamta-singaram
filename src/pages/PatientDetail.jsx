@@ -5,6 +5,7 @@ import {
   Calendar,
   ChevronDown,
   ChevronUp,
+  FileText,
   Pencil,
   Plus,
 } from 'lucide-react'
@@ -27,6 +28,7 @@ import {
 import AppointmentDetailModal from '../components/AppointmentDetailModal'
 import LedgerCalendar from '../components/LedgerCalendar'
 import LedgerDetailModal from '../components/LedgerDetailModal'
+import PatientReport from '../components/PatientReport'
 
 const filterOptions = [
   { label: '3M', value: '3M' },
@@ -55,6 +57,7 @@ function PatientDetail() {
   const [ledgerFilter, setLedgerFilter] = useState('All')
   const [selectedLedgerEntry, setSelectedLedgerEntry] = useState(null)
   const [labEntries, setLabEntries] = useState([])
+  const [showReport, setShowReport] = useState(false)
 
   useEffect(() => {
     const load = async () => {
@@ -271,6 +274,14 @@ function PatientDetail() {
                   >
                     <Pencil className="h-3.5 w-3.5" />
                     Edit Patient
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowReport(true)}
+                    className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50"
+                  >
+                    <FileText className="h-3.5 w-3.5" />
+                    Generate Report
                   </button>
                 </div>
 
@@ -731,6 +742,17 @@ function PatientDetail() {
           )}
         </section>
       </div>
+
+      {showReport && (
+        <PatientReport
+          patient={patient}
+          sessions={sessions}
+          appointments={appointments}
+          ledgerEntries={ledgerEntries}
+          labEntries={labEntries}
+          onClose={() => setShowReport(false)}
+        />
+      )}
     </main>
   )
 }

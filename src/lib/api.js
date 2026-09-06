@@ -192,11 +192,11 @@ export function formatFileSize(bytes) {
   return `${(bytes / 1024).toFixed(1)} KB`
 }
 export function validateSessionFile(file) {
-  const ALLOWED_TYPES = ['application/pdf', 'image/jpeg', 'image/png']
+  const ALLOWED_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/heic', 'image/heif']
   const MAX_SIZE_BYTES = 512000
   if (!file) return { valid: false, message: 'No file selected.', error: 'No file selected.' }
   if (!ALLOWED_TYPES.includes(file.type)) {
-    const msg = `Unsupported file type: ${file.type}. Allowed: PDF, JPG, PNG.`
+    const msg = `Unsupported file type: ${file.type || 'unknown'}. Allowed: PDF, JPG, PNG, HEIC, HEIF.`
     return { valid: false, message: msg, error: msg }
   }
   if (file.size >= MAX_SIZE_BYTES) {

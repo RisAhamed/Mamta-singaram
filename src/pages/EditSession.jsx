@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   Check,
@@ -6,7 +6,6 @@ import {
   Eye,
   FileText,
   Loader2,
-  Paperclip,
   Trash2,
   X,
 } from 'lucide-react'
@@ -14,6 +13,7 @@ import { useToast } from '../hooks/useToast'
 import { CONSULTATION_FORMS } from '../lib/consultationForms'
 import MasterSelect from '../components/MasterSelect'
 import LabEntryForm from '../components/LabEntryForm'
+import FileUpload from '../components/FileUpload'
 import {
   getSession,
   getPatient,
@@ -21,13 +21,10 @@ import {
   updateSession,
   deleteSession,
   getSessionFiles,
-  uploadSessionFile,
   deleteSessionFile,
   getConsultationForms,
   createConsultationForm,
   deleteConsultationForm,
-  validateSessionFile,
-  formatFileSize,
   getLocations,
   createLocation,
   getFacialBones,
@@ -35,6 +32,10 @@ import {
   getSurgeryNotes,
   upsertSurgeryNotes,
   deleteSurgeryNotes,
+  getSurgeryForms,
+  getSessionSurgeryForms,
+  linkSurgeryForm,
+  unlinkSurgeryForm,
 } from '../lib/api'
 
 const emptyChartForm = {
@@ -73,6 +74,10 @@ function EditSession() {
   const [surgeryNotes, setSurgeryNotes] = useState('')
   const [facialBoneId, setFacialBoneId] = useState('')
   const [facialBoneNameSnapshot, setFacialBoneNameSnapshot] = useState('')
+  const [surgeryForms, setSurgeryForms] = useState([])
+  const [linkedForms, setLinkedForms] = useState([])
+  const [availableForms, setAvailableForms] = useState([])
+  const [linkingForm, setLinkingForm] = useState(false)
 
   const [age, setAge] = useState('')
   const [weight, setWeight] = useState('')
@@ -82,9 +87,7 @@ function EditSession() {
   const [spo2, setSpo2] = useState('')
 
   const [sessionFiles, setSessionFiles] = useState([])
-  const [pendingFiles, setPendingFiles] = useState([])
-  const [fileErrors, setFileErrors] = useState([])
-  const [uploadingFile, setUploadingFile] = useState(false)
+  const fileUploadRef = useRef(null)
   const [deletingFileId, setDeletingFileId] = useState(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState(null)
 
@@ -164,6 +167,24 @@ function EditSession() {
           }
         } catch (e) {
           void e
+        }
+
+        // Fetch surgery forms (available + linked)
+        try {
+          const [allForms, linkedRes] = await Promise.all([
+            getSurgeryForms(true),
+            getSessionSurgeryForms(sid)
+          ])
+          const formsArr = Array.isArray(allForms) ? allForms : allForms?.data ?? []
+          const linkedArr = Array.isArray(linkedRes) ? linkedRes : linkedRes?.data ?? []
+          setSurgeryForms(formsArr)
+          setLinkedForms(linkedArr)
+          const linkedIds = new Set(linkedArr.map(f => f.surgery_form_id))
+          setAvailableForms(formsArr.filter(f => !linkedIds.has(f.id)))
+        } catch {
+          setSurgeryForms([])
+          setLinkedForms([])
+          setAvailableForms([])
         }
 
         // Handle both nested vitals and flat columns
@@ -298,54 +319,6 @@ function EditSession() {
     )
   }
 
-  const handleFilesSelected = (event) => {
-    const incomingFiles = Array.from(event.target.files || [])
-    if (!incomingFiles.length) return
-
-    const nextValid = []
-    const nextErrors = []
-
-    incomingFiles.forEach((file) => {
-      // Check for duplicate in pendingFiles
-      const isDuplicate = pendingFiles.some(
-        (item) => item.name === file.name && item.size === file.size && item.type === file.type
-      )
-      if (isDuplicate) {
-        nextErrors.push(`${file.name}: already added`)
-        return
-      }
-
-      const result = validateSessionFile(file)
-      if (result.valid) {
-        nextValid.push({
-          id: `${file.name}-${file.size}-${Date.now()}-${Math.random()}`,
-          file,
-          name: file.name,
-          size: file.size,
-          type: file.type,
-        })
-      } else {
-        nextErrors.push(`${file.name}: ${result.message}`)
-      }
-    })
-
-    if (nextValid.length > 0) {
-      setPendingFiles((prev) => [...prev, ...nextValid])
-    }
-
-    if (nextErrors.length > 0) {
-      setFileErrors(nextErrors)
-    } else {
-      setFileErrors([])
-    }
-
-    event.target.value = ''
-  }
-
-  const removePendingFile = (fileId) => {
-    setPendingFiles((prev) => prev.filter((item) => item.id !== fileId))
-  }
-
   const handleUpdate = async () => {
     if (saving) return
     if (!chiefComplaint.trim()) {
@@ -356,7 +329,7 @@ function EditSession() {
       showToast('Next Appointment Date is required.', 'warning')
       return
     }
-    if (sessionFiles.length === 0 && pendingFiles.length === 0) {
+    if (sessionFiles.length === 0 && (!fileUploadRef.current || !fileUploadRef.current.hasPending())) {
       showToast('Upload Photos is required — please add at least one photo/document.', 'warning')
       return
     }
@@ -400,33 +373,17 @@ function EditSession() {
       console.log('[EditSession] Session updated successfully via REST API')
 
       // Upload pending files if any are selected
-      if (pendingFiles.length > 0) {
+      if (fileUploadRef.current && fileUploadRef.current.hasPending()) {
         try {
-          setUploadingFile(true)
-          const uploadResults = await Promise.allSettled(
-            pendingFiles.map((item) => uploadSessionFile(sessionId, item.file))
-          )
+          const { success } = await fileUploadRef.current.uploadAll(sessionId)
 
-          const failedFiles = uploadResults
-            .map((result, index) => ({ result, item: pendingFiles[index] }))
-            .filter(({ result }) => result.status === 'rejected')
-            .map(({ item, result }) => ({
-              ...item,
-              uploadError: result.reason?.message || 'Upload failed',
-            }))
-
-          if (failedFiles.length > 0) {
-            setPendingFiles(failedFiles)
-            setFileErrors(failedFiles.map((item) => `${item.name}: ${item.uploadError}`))
+          if (!success) {
             showToast(
               'Session updated, but some document uploads failed. Click Update Session again to retry.',
               'warning',
             )
             return
           }
-
-          setPendingFiles([])
-          setFileErrors([])
 
           // Reload documents from backend
           const filesRes = await getSessionFiles(sessionId)
@@ -439,8 +396,6 @@ function EditSession() {
             'warning',
           )
           return
-        } finally {
-          setUploadingFile(false)
         }
       }
 
@@ -1085,6 +1040,86 @@ function EditSession() {
             </label>
           </div>
 
+          {/* Surgery Forms — framework for future form submissions */}
+          <div className="mb-4 rounded-xl border bg-white p-4">
+            <h2 className="mb-3 font-semibold">Surgery Forms</h2>
+            {linkedForms.length === 0 && availableForms.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-6 text-center">
+                <FileText className="mx-auto h-6 w-6 text-slate-300" />
+                <p className="mt-2 text-sm text-slate-500">No surgery forms available</p>
+                <p className="mt-1 text-xs text-slate-400">Surgery forms will appear here once registered by the administrator.</p>
+              </div>
+            ) : (
+              <>
+                {linkedForms.length > 0 && (
+                  <div className="mb-3 space-y-2">
+                    <p className="text-xs font-medium uppercase text-slate-500">Linked Forms</p>
+                    {linkedForms.map(link => (
+                      <div key={link.id} className="flex items-center justify-between rounded-lg border border-teal-200 bg-teal-50 p-3">
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-teal-900">{link.title}</p>
+                          {link.form_description && <p className="mt-0.5 text-xs text-teal-700">{link.form_description}</p>}
+                          <p className="mt-0.5 text-xs text-teal-600">Status: {link.status || 'draft'}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {link.file_url && (
+                            <a href={link.file_url} target="_blank" rel="noopener noreferrer" className="rounded p-1 text-teal-600 hover:bg-teal-100">
+                              <ExternalLink className="h-4 w-4" />
+                            </a>
+                          )}
+                          <button type="button" onClick={async () => {
+                            try {
+                              await unlinkSurgeryForm(sessionId, link.id)
+                              const linkedRes = await getSessionSurgeryForms(sessionId)
+                              const linkedArr = Array.isArray(linkedRes) ? linkedRes : linkedRes?.data ?? []
+                              setLinkedForms(linkedArr)
+                              const linkedIds = new Set(linkedArr.map(f => f.surgery_form_id))
+                              setAvailableForms(surgeryForms.filter(f => !linkedIds.has(f.id)))
+                              showToast('Form unlinked', 'success')
+                            } catch(e) { showToast(e.message, 'error') }
+                          }} className="rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-600">
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {availableForms.length > 0 && (
+                  <div>
+                    <p className="mb-2 text-xs font-medium uppercase text-slate-500">Available Forms</p>
+                    <div className="flex flex-wrap gap-2">
+                      {availableForms.map(form => (
+                        <button
+                          key={form.id}
+                          type="button"
+                          disabled={linkingForm}
+                          onClick={async () => {
+                            setLinkingForm(true)
+                            try {
+                              await linkSurgeryForm(sessionId, { surgery_form_id: form.id })
+                              const linkedRes = await getSessionSurgeryForms(sessionId)
+                              const linkedArr = Array.isArray(linkedRes) ? linkedRes : linkedRes?.data ?? []
+                              setLinkedForms(linkedArr)
+                              const linkedIds = new Set(linkedArr.map(f => f.surgery_form_id))
+                              setAvailableForms(surgeryForms.filter(f => !linkedIds.has(f.id)))
+                              showToast('Form linked', 'success')
+                            } catch(e) { showToast(e.message, 'error') }
+                            finally { setLinkingForm(false) }
+                          }}
+                          className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                        >
+                          <FileText className="h-3.5 w-3.5" />
+                          {form.title}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+
           <div className="mb-4 rounded-xl border bg-white p-4">
             <h2 className="mb-3 font-semibold">Lab Entries</h2>
             <p className="mb-3 text-sm text-gray-600">Lab/vendor records linked to this session. Historical entries are preserved even if a lab is later deactivated.</p>
@@ -1181,155 +1216,31 @@ function EditSession() {
           {/* ── Upload Photos (mandatory) ──────────────────────────────────── */}
           <div className="mb-6 rounded-xl border bg-white p-4">
             <h2 className="mb-3 font-semibold">Upload Photos <span className="text-rose-600">*</span></h2>
-            <div className="space-y-4">
-              <p className="text-xs text-slate-500">
-                <span className="text-rose-600">*</span> Required — at least one photo/document is required. Allowed: PDF/JPG/PNG. Maximum file size: 0.5 MB per file. You can add multiple files. <span className="hidden sm:inline">On iPhone, tap to take a photo or choose from library.</span>
-              </p>
-
-              {/* Upload control / File Picker */}
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-                <input
-                  type="file"
-                  multiple
-                  accept="image/*,application/pdf,.pdf,.jpg,.jpeg,.png"
-                  onChange={handleFilesSelected}
-                  className="flex-1 text-sm text-slate-600 file:mr-3 file:rounded-md file:border file:border-slate-300 file:bg-white file:px-3 file:py-2 file:text-sm file:font-medium file:text-slate-700 file:transition hover:file:bg-slate-50"
-                />
-              </div>
-
-              {fileErrors.length > 0 && (
-                <div className="space-y-1">
-                  {fileErrors.map((err, idx) => (
-                    <p key={idx} className="text-xs text-red-600 font-medium">⚠️ {err}</p>
-                  ))}
-                </div>
-              )}
-
-              {/* Pending uploads list */}
-              {pendingFiles.length > 0 && (
-                <div className="space-y-2 pt-2 border-t border-slate-100">
-                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
-                    Pending uploads ({pendingFiles.length})
-                  </p>
-                  <div className="space-y-1.5">
-                    {pendingFiles.map((item) => (
-                      <div
-                        key={item.id}
-                        className="flex items-center justify-between gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2"
-                      >
-                        <div className="min-w-0 flex-1 flex items-center gap-2">
-                          <Paperclip className="h-4 w-4 text-teal-600 shrink-0" />
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-medium text-slate-700">
-                              {item.name}
-                            </p>
-                            <p className="text-xs text-slate-400">
-                              {formatFileSize(item.size)}
-                            </p>
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => removePendingFile(item.id)}
-                          className="inline-flex items-center gap-1 rounded border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-600 transition hover:bg-slate-50"
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {uploadingFile && (
-                <div className="flex items-center gap-2 text-sm text-slate-500">
-                  <Loader2 className="h-4 w-4 animate-spin text-teal-600" />
-                  Uploading documents…
-                </div>
-              )}
-
-              {/* Existing files list */}
-              {sessionFiles.length > 0 && (
-                <div className="space-y-2 pt-2 border-t border-slate-100">
-                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
-                    Uploaded documents ({sessionFiles.length})
-                  </p>
-                  <div className="space-y-2">
-                    {sessionFiles.map((file) => (
-                      <div
-                        key={file.id}
-                        className="flex items-center justify-between gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-medium text-slate-700">
-                            {file.file_name}
-                          </p>
-                          <p className="text-xs text-slate-400">
-                            {formatFileSize(file.file_size_bytes)}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          <button
-                            type="button"
-                            onClick={() => window.open(file.download_url, '_blank', 'noopener,noreferrer')}
-                            className="inline-flex items-center gap-1 rounded border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-teal-700 transition hover:bg-teal-50"
-                          >
-                            <ExternalLink className="h-3 w-3" />
-                            Open
-                          </button>
-                          {confirmDeleteId === file.id ? (
-                            <div className="flex items-center gap-1">
-                              <button
-                                type="button"
-                                disabled={deletingFileId === file.id}
-                                onClick={async () => {
-                                  try {
-                                    setDeletingFileId(file.id)
-                                    await deleteSessionFile(file.id)
-                                    setSessionFiles((prev) => prev.filter((f) => f.id !== file.id))
-                                    showToast('File deleted', 'success')
-                                  } catch (err) {
-                                    console.error('Delete error:', err)
-                                    showToast('Failed to delete file', 'error')
-                                  } finally {
-                                    setDeletingFileId(null)
-                                    setConfirmDeleteId(null)
-                                  }
-                                }}
-                                className="inline-flex items-center gap-1 rounded border border-red-300 bg-red-50 px-2 py-1 text-xs font-medium text-red-700 transition hover:bg-red-100 disabled:opacity-50"
-                              >
-                                {deletingFileId === file.id ? (
-                                  <Loader2 className="h-3 w-3 animate-spin" />
-                                ) : (
-                                  <Trash2 className="h-3 w-3" />
-                                )}
-                                Confirm
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setConfirmDeleteId(null)}
-                                className="rounded border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-600 transition hover:bg-slate-50"
-                              >
-                                Cancel
-                              </button>
-                            </div>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => setConfirmDeleteId(file.id)}
-                              className="inline-flex items-center gap-1 rounded border border-red-200 bg-white px-2 py-1 text-xs font-medium text-red-600 transition hover:bg-red-50"
-                            >
-                              <Trash2 className="h-3 w-3" />
-                              Delete
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
+            <FileUpload
+              ref={fileUploadRef}
+              required
+              showExistingFiles
+              existingFiles={sessionFiles}
+              deletingFileId={deletingFileId}
+              confirmDeleteId={confirmDeleteId}
+              onOpenFile={(file) => window.open(file.file_url || file.download_url, '_blank', 'noopener,noreferrer')}
+              onDeleteFile={async (file) => {
+                try {
+                  setDeletingFileId(file.id)
+                  await deleteSessionFile(file.id)
+                  setSessionFiles((prev) => prev.filter((f) => f.id !== file.id))
+                  showToast('File deleted', 'success')
+                } catch (err) {
+                  console.error('Delete error:', err)
+                  showToast('Failed to delete file', 'error')
+                } finally {
+                  setDeletingFileId(null)
+                  setConfirmDeleteId(null)
+                }
+              }}
+              onConfirmDelete={(fileId) => setConfirmDeleteId(fileId)}
+              onCancelDelete={() => setConfirmDeleteId(null)}
+            />
           </div>
         </div>
       </div>
