@@ -36,7 +36,18 @@ router.get('/', async (req, res) => {
 })
 
 // POST /api/sessions/:sessionId/files - upload to R2
-router.post('/', upload.single('file'), async (req, res) => {
+router.post('/', (req, res, next) => {
+  upload.single('file')(req, res, (err) => {
+    if (err) {
+      console.error('Multer upload error:', err.message)
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json({ error: 'File too large. Max 0.5 MB' })
+      }
+      return res.status(400).json({ error: err.message })
+    }
+    next()
+  })
+}, async (req, res) => {
   try {
     const { sessionId } = req.params
     const { description } = req.body
@@ -50,13 +61,25 @@ router.post('/', upload.single('file'), async (req, res) => {
     const key = `patients/${patient_id}/sessions/${sessionId}/${Date.now()}_${safeName}`
 
     await uploadFile(key, req.file.buffer, req.file.mimetype)
-    const file_url = await getFileUrl(key)
+    let file_url
+    try {
+      file_url = await getFileUrl(key)
+    } catch (urlErr) {
+      await deleteFile(key).catch(() => {})
+      throw urlErr
+    }
 
-    const result = await pool.query(
-      `INSERT INTO session_files (session_id, patient_id, file_name, file_type, file_size_bytes, storage_path, file_url, description)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
-      [sessionId, patient_id, req.file.originalname, req.file.mimetype, req.file.size, key, file_url, description || null]
-    )
+    let result
+    try {
+      result = await pool.query(
+        `INSERT INTO session_files (session_id, patient_id, file_name, file_type, file_size_bytes, storage_path, file_url, description)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+        [sessionId, patient_id, req.file.originalname, req.file.mimetype, req.file.size, key, file_url, description || null]
+      )
+    } catch (dbErr) {
+      await deleteFile(key).catch(() => {})
+      throw dbErr
+    }
     res.status(201).json(result.rows[0])
   } catch (err) {
     console.error('POST session files error:', err.message)

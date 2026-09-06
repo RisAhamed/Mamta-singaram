@@ -3,16 +3,30 @@ import pool from '../db.js'
 
 const router = Router()
 
+function toNullableInt(val) {
+  if (val === undefined || val === null || val === '') return null
+  const n = parseInt(val, 10)
+  return Number.isNaN(n) ? null : n
+}
+
+function toNullableFloat(val) {
+  if (val === undefined || val === null || val === '') return null
+  const n = parseFloat(val)
+  return Number.isNaN(n) ? null : n
+}
+
 function extractVitals(body) {
   // Support both nested vitals object and flat columns
   const v = body.vitals || {}
   return {
-    age: body.age !== undefined ? body.age : v.age,
-    weight: body.weight !== undefined ? body.weight : v.weight,
-    blood_pressure: body.blood_pressure !== undefined ? body.blood_pressure : v.blood_pressure,
-    blood_sugar: body.blood_sugar !== undefined ? body.blood_sugar : v.blood_sugar,
-    pulse_rate: body.pulse_rate !== undefined ? body.pulse_rate : v.pulse_rate,
-    spo2: body.spo2 !== undefined ? body.spo2 : v.spo2,
+    age: toNullableInt(body.age !== undefined ? body.age : v.age),
+    weight: toNullableFloat(body.weight !== undefined ? body.weight : v.weight),
+    blood_pressure: (body.blood_pressure !== undefined ? body.blood_pressure : v.blood_pressure)
+      ? String(body.blood_pressure !== undefined ? body.blood_pressure : v.blood_pressure).trim()
+      : null,
+    blood_sugar: toNullableFloat(body.blood_sugar !== undefined ? body.blood_sugar : v.blood_sugar),
+    pulse_rate: toNullableInt(body.pulse_rate !== undefined ? body.pulse_rate : v.pulse_rate),
+    spo2: toNullableFloat(body.spo2 !== undefined ? body.spo2 : v.spo2),
   }
 }
 
@@ -132,17 +146,17 @@ router.post('/', async (req, res) => {
         treatment_given ? treatment_given.trim() : null,
         injection_given ? true : false,
         injection_details ? injection_details.trim() : null,
-        treatment_cost !== undefined && treatment_cost !== '' && treatment_cost !== null ? treatment_cost : 0,
-        amount_paid !== undefined && amount_paid !== '' && amount_paid !== null ? amount_paid : 0,
+        toNullableFloat(treatment_cost) ?? 0,
+        toNullableFloat(amount_paid) ?? 0,
         payment_status || 'Pending',
         notes ? notes.trim() : null,
         next_visit_date || null,
-        vitals.age !== undefined && vitals.age !== '' && vitals.age !== null ? parseInt(vitals.age, 10) : null,
-        vitals.weight !== undefined && vitals.weight !== '' && vitals.weight !== null ? vitals.weight : null,
-        vitals.blood_pressure ? String(vitals.blood_pressure).trim() : null,
-        vitals.blood_sugar !== undefined && vitals.blood_sugar !== '' && vitals.blood_sugar !== null ? vitals.blood_sugar : null,
-        vitals.pulse_rate !== undefined && vitals.pulse_rate !== '' && vitals.pulse_rate !== null ? parseInt(vitals.pulse_rate, 10) : null,
-        vitals.spo2 !== undefined && vitals.spo2 !== '' && vitals.spo2 !== null ? vitals.spo2 : null,
+        vitals.age,
+        vitals.weight,
+        vitals.blood_pressure,
+        vitals.blood_sugar,
+        vitals.pulse_rate,
+        vitals.spo2,
       ]
     )
     const session = sessionRes.rows[0]
@@ -236,17 +250,17 @@ router.put('/:id', async (req, res) => {
     if (treatment_given !== undefined) fields.treatment_given = treatment_given
     if (injection_given !== undefined) fields.injection_given = Boolean(injection_given)
     if (injection_details !== undefined) fields.injection_details = injection_details
-    if (treatment_cost !== undefined) fields.treatment_cost = treatment_cost
-    if (amount_paid !== undefined) fields.amount_paid = amount_paid
+    if (treatment_cost !== undefined) fields.treatment_cost = toNullableFloat(treatment_cost) ?? 0
+    if (amount_paid !== undefined) fields.amount_paid = toNullableFloat(amount_paid) ?? 0
     if (payment_status !== undefined) fields.payment_status = payment_status
     if (notes !== undefined) fields.notes = notes
     if (next_visit_date !== undefined) fields.next_visit_date = next_visit_date || null
-    if (vitals.age !== undefined) fields.age = vitals.age !== '' && vitals.age !== null ? parseInt(vitals.age, 10) : null
-    if (vitals.weight !== undefined) fields.weight = vitals.weight !== '' && vitals.weight !== null ? vitals.weight : null
-    if (vitals.blood_pressure !== undefined) fields.blood_pressure = vitals.blood_pressure ? String(vitals.blood_pressure).trim() : null
-    if (vitals.blood_sugar !== undefined) fields.blood_sugar = vitals.blood_sugar !== '' && vitals.blood_sugar !== null ? vitals.blood_sugar : null
-    if (vitals.pulse_rate !== undefined) fields.pulse_rate = vitals.pulse_rate !== '' && vitals.pulse_rate !== null ? parseInt(vitals.pulse_rate, 10) : null
-    if (vitals.spo2 !== undefined) fields.spo2 = vitals.spo2 !== '' && vitals.spo2 !== null ? vitals.spo2 : null
+    if (vitals.age !== undefined) fields.age = vitals.age
+    if (vitals.weight !== undefined) fields.weight = vitals.weight
+    if (vitals.blood_pressure !== undefined) fields.blood_pressure = vitals.blood_pressure
+    if (vitals.blood_sugar !== undefined) fields.blood_sugar = vitals.blood_sugar
+    if (vitals.pulse_rate !== undefined) fields.pulse_rate = vitals.pulse_rate
+    if (vitals.spo2 !== undefined) fields.spo2 = vitals.spo2
 
     if (Object.keys(fields).length > 0) {
       const setClauses = []

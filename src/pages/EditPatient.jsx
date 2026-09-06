@@ -270,7 +270,7 @@ function EditPatient() {
           <div>
             <label className="block text-xs text-slate-500 mb-1">Weight (kg)</label>
             <input
-              type="number" min="0"
+              type="number" min="0" step="any"
               placeholder="e.g. 70"
               value={weight}
               onChange={e => setWeight(e.target.value)}
@@ -290,7 +290,7 @@ function EditPatient() {
           <div>
             <label className="block text-xs text-slate-500 mb-1">Blood Sugar (mg/dL)</label>
             <input
-              type="number" min="0"
+              type="number" min="0" step="any"
               placeholder="e.g. 110"
               value={bloodSugar}
               onChange={e => setBloodSugar(e.target.value)}
@@ -300,7 +300,7 @@ function EditPatient() {
           <div>
             <label className="block text-sm font-medium text-slate-800 mb-1">Pulse Rate (bpm)</label>
             <input
-              type="number" min="0"
+              type="number" min="0" step="1"
               placeholder="e.g. 72"
               value={pulseRate}
               onChange={e => setPulseRate(e.target.value)}
@@ -310,7 +310,7 @@ function EditPatient() {
           <div>
             <label className="block text-sm font-medium text-slate-800 mb-1">SPO2 (%)</label>
             <input
-              type="number" min="0" max="100"
+              type="number" min="0" max="100" step="any"
               placeholder="e.g. 98"
               value={spo2}
               onChange={e => setSpo2(e.target.value)}

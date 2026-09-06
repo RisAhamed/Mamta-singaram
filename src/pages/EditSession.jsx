@@ -8,7 +8,6 @@ import {
   Loader2,
   Paperclip,
   Trash2,
-  Upload,
   X,
 } from 'lucide-react'
 import { useToast } from '../hooks/useToast'
@@ -455,7 +454,9 @@ function EditSession() {
             const cfRes = await getConsultationForms(sessionId)
             const cfList = Array.isArray(cfRes) ? cfRes : (cfRes?.data ?? cfRes?.consultation_forms ?? [])
             setSavedConsultationForms(cfList)
-          } catch {}
+          } catch (cfFetchErr) {
+            console.error('Failed to refresh consultation forms:', cfFetchErr)
+          }
         } catch (cfErr) {
           console.error('Consultation form upload error:', cfErr)
           showToast(
@@ -601,7 +602,7 @@ function EditSession() {
               <label className="text-sm text-gray-600">
                 Weight (kg)
                 <input
-                  type="number" min="0"
+                  type="number" min="0" step="any"
                   placeholder="e.g. 70"
                   value={weight}
                   onChange={e => setWeight(e.target.value)}
@@ -621,7 +622,7 @@ function EditSession() {
               <label className="text-sm text-gray-600">
                 Blood Sugar (mg/dL)
                 <input
-                  type="number" min="0"
+                  type="number" min="0" step="any"
                   placeholder="e.g. 110"
                   value={bloodSugar}
                   onChange={e => setBloodSugar(e.target.value)}
@@ -631,7 +632,7 @@ function EditSession() {
               <label className="text-sm text-gray-600">
                 Pulse Rate (bpm)
                 <input
-                  type="number" min="0"
+                  type="number" min="0" step="1"
                   placeholder="e.g. 72"
                   value={pulseRate}
                   onChange={e => setPulseRate(e.target.value)}
@@ -641,7 +642,7 @@ function EditSession() {
               <label className="text-sm text-gray-600">
                 SPO2 (%)
                 <input
-                  type="number" min="0" max="100"
+                  type="number" min="0" max="100" step="any"
                   placeholder="e.g. 98"
                   value={spo2}
                   onChange={e => setSpo2(e.target.value)}
@@ -1033,7 +1034,7 @@ function EditSession() {
                 Treatment Cost ₹
                 <input
                   type="number"
-                  step="1"
+                  step="any"
                   min="0"
                   value={treatmentCost}
                   onChange={(event) => setTreatmentCost(event.target.value)}
@@ -1044,7 +1045,7 @@ function EditSession() {
                 Amount Paid ₹
                 <input
                   type="number"
-                  step="1"
+                  step="any"
                   min="0"
                   value={amountPaid}
                   onChange={(event) => setAmountPaid(event.target.value)}

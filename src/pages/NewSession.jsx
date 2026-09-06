@@ -3,7 +3,6 @@ import { format } from 'date-fns'
 import {
   Check,
   ChevronDown,
-  Eye,
   FileText,
   Loader2,
   Paperclip,
@@ -623,7 +622,7 @@ function NewSession() {
             </Field>
             <Field label="Weight (kg)" name="weight">
               <input
-                type="number" min="0"
+                type="number" min="0" step="any"
                 placeholder="e.g. 70"
                 value={weight}
                 onChange={e => setWeight(e.target.value)}
@@ -641,7 +640,7 @@ function NewSession() {
             </Field>
             <Field label="Blood Sugar (mg/dL)" name="blood_sugar">
               <input
-                type="number" min="0"
+                type="number" min="0" step="any"
                 placeholder="e.g. 110"
                 value={bloodSugar}
                 onChange={e => setBloodSugar(e.target.value)}
@@ -650,7 +649,7 @@ function NewSession() {
             </Field>
             <Field label="Pulse Rate (bpm)" name="pulse_rate">
               <input
-                type="number" min="0"
+                type="number" min="0" step="1"
                 placeholder="e.g. 72"
                 value={pulseRate}
                 onChange={e => setPulseRate(e.target.value)}
@@ -659,7 +658,7 @@ function NewSession() {
             </Field>
             <Field label="SPO2 (%)" name="spo2">
               <input
-                type="number" min="0" max="100"
+                type="number" min="0" max="100" step="any"
                 placeholder="e.g. 98"
                 value={spo2}
                 onChange={e => setSpo2(e.target.value)}
@@ -1221,7 +1220,7 @@ function CurrencyField({ label, name, value, onChange }) {
           name={name}
           type="number"
           min="0"
-          step="1"
+          step="any"
           value={value}
           onChange={onChange}
           className={`${inputClassName} pl-8`}
