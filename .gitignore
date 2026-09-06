@@ -30,3 +30,5 @@ dev-server*
 .playwright-cli
 backend.out.log
 backend.*.log
+.env*
+.env.*

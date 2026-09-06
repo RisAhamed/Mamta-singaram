@@ -23,6 +23,7 @@ import labEntriesRouter from './routes/labEntries.js'
 import patientLedgerRouter from './routes/patientLedger.js'
 import patientLabEntriesRouter from './routes/patientLabEntries.js'
 import sessionSurgeryFormsRouter from './routes/sessionSurgeryForms.js'
+import labsRouter from './routes/labs.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -69,6 +70,7 @@ app.get('/api/health', async (req, res) => {
 })
 
 // Mount routers - nested session sub-resources first to avoid /:id collision
+app.use('/api/labs', labsRouter)
 app.use('/api/locations', locationsRouter)
 app.use('/api/lab-vendors', labVendorsRouter)
 app.use('/api/facial-bones', facialBonesRouter)

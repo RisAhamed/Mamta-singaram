@@ -210,7 +210,7 @@ CREATE TABLE surgery_notes (
   UNIQUE(session_id)
 );
 
--- lab_entries
+-- lab_entries (extended: product, financial, dates, status)
 CREATE TABLE lab_entries (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   session_id UUID NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
@@ -219,7 +219,10 @@ CREATE TABLE lab_entries (
   lab_vendor_name TEXT,
   test_name TEXT NOT NULL,
   cost NUMERIC(10,2) DEFAULT 0,
+  amount_paid NUMERIC(10,2) DEFAULT 0,
   entry_date DATE DEFAULT CURRENT_DATE,
+  required_date DATE,
+  status TEXT DEFAULT 'Ordered' CHECK (status IN ('Ordered','Received','Cancelled')),
   notes TEXT,
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
@@ -291,6 +294,9 @@ CREATE INDEX IF NOT EXISTS idx_appointments_location ON appointments(location_id
 CREATE INDEX IF NOT EXISTS idx_lab_entries_session ON lab_entries(session_id);
 CREATE INDEX IF NOT EXISTS idx_lab_entries_patient ON lab_entries(patient_id);
 CREATE INDEX IF NOT EXISTS idx_lab_entries_vendor ON lab_entries(lab_vendor_id);
+CREATE INDEX IF NOT EXISTS idx_lab_entries_status ON lab_entries(status);
+CREATE INDEX IF NOT EXISTS idx_lab_entries_entry_date ON lab_entries(entry_date);
+CREATE INDEX IF NOT EXISTS idx_lab_entries_required_date ON lab_entries(required_date);
 CREATE INDEX IF NOT EXISTS idx_surgery_notes_session ON surgery_notes(session_id);
 CREATE INDEX IF NOT EXISTS idx_surgery_notes_patient ON surgery_notes(patient_id);
 CREATE INDEX IF NOT EXISTS idx_ledger_patient ON patient_ledger_entries(patient_id);

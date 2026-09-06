@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import {
   CalendarDays,
+  FlaskConical,
   IndianRupee,
   LayoutDashboard,
   Menu,
@@ -18,6 +19,7 @@ const navigationItems = [
   { label: 'Dashboard', path: '/', icon: LayoutDashboard, aliases: ['/dashboard'] },
   { label: 'Patients', path: '/patients', icon: Users },
   { label: 'Appointments', path: '/appointments', icon: CalendarDays },
+  { label: 'Laboratory', path: '/labs', icon: FlaskConical },
   { label: 'Doctors', path: '/doctors', icon: Stethoscope },
   { label: 'Payments', path: '/payments', icon: IndianRupee },
 ]
@@ -33,6 +35,7 @@ const routeTitles = [
   { matcher: /^\/patients\/[^/]+$/, title: 'Patient Detail' },
   { matcher: /^\/patients$/, title: 'Patients' },
   { matcher: /^\/appointments$/, title: 'Appointments' },
+  { matcher: /^\/labs(\/.*)?$/, title: 'Laboratory' },
   { matcher: /^\/doctors$/, title: 'Doctors' },
   { matcher: /^\/payments$/, title: 'Payments' },
   { matcher: /^\/search$/, title: 'Search' },

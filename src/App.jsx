@@ -12,6 +12,8 @@ import Payments from './pages/Payments'
 import Search from './pages/Search'
 import PrescriptionPad from './pages/PrescriptionPad'
 import Appointments from './pages/Appointments'
+import Labs from './pages/Labs'
+import LabDetail from './pages/LabDetail'
 
 function App() {
   return (
@@ -25,6 +27,8 @@ function App() {
             <Route path="/patients/:patientId" element={<PatientDetail />} />
             <Route path="/patients/:patientId/edit" element={<EditPatient />} />
             <Route path="/appointments" element={<Appointments />} />
+            <Route path="/labs" element={<Labs />} />
+            <Route path="/labs/:labId" element={<LabDetail />} />
             <Route path="/doctors" element={<Doctors />} />
             <Route path="/payments" element={<Payments />} />
             <Route path="/search" element={<Search />} />

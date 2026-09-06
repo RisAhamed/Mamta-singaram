@@ -185,6 +185,20 @@ export function getSessionSurgeryForms(sessionId) { return request(`/api/session
 export function linkSurgeryForm(sessionId, data) { return request(`/api/sessions/${sessionId}/surgery-forms`, { method: 'POST', body: JSON.stringify(data) }) }
 export function unlinkSurgeryForm(sessionId, linkId) { return request(`/api/sessions/${sessionId}/surgery-forms/${linkId}`, { method: 'DELETE' }) }
 
+// Lab Management Portal
+export function getLabSummary() { return request('/api/labs/summary') }
+export function getLabDetail(labId, filters = {}) {
+  const p = new URLSearchParams()
+  if (filters.from) p.set('from', filters.from)
+  if (filters.to) p.set('to', filters.to)
+  if (filters.status) p.set('status', filters.status)
+  if (filters.patient_search) p.set('patient_search', filters.patient_search)
+  if (filters.limit) p.set('limit', String(filters.limit))
+  if (filters.offset) p.set('offset', String(filters.offset))
+  const qs = p.toString() ? `?${p.toString()}` : ''
+  return request(`/api/labs/${labId}${qs}`)
+}
+
 // Helpers kept for frontend compatibility
 export function formatFileSize(bytes) {
   if (!bytes || bytes === 0) return '0 B'
