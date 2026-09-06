@@ -20,8 +20,13 @@ import {
   getAppointments,
   updateAppointment,
   deleteAppointment,
+  getPatientLedger,
+  deleteLedgerEntry,
+  getPatientLabEntries,
 } from '../lib/api'
 import AppointmentDetailModal from '../components/AppointmentDetailModal'
+import LedgerCalendar from '../components/LedgerCalendar'
+import LedgerDetailModal from '../components/LedgerDetailModal'
 
 const filterOptions = [
   { label: '3M', value: '3M' },
@@ -44,6 +49,12 @@ function PatientDetail() {
   const [appointments, setAppointments] = useState([])
   const [apptFilter, setApptFilter] = useState('All')
   const [selectedAppt, setSelectedAppt] = useState(null)
+  const [ledgerEntries, setLedgerEntries] = useState([])
+  const [ledgerMonth, setLedgerMonth] = useState(new Date())
+  const [ledgerView, setLedgerView] = useState('calendar')
+  const [ledgerFilter, setLedgerFilter] = useState('All')
+  const [selectedLedgerEntry, setSelectedLedgerEntry] = useState(null)
+  const [labEntries, setLabEntries] = useState([])
 
   useEffect(() => {
     const load = async () => {
@@ -152,6 +163,24 @@ function PatientDetail() {
           setAppointments(apptArr)
         } catch {
           setAppointments([])
+        }
+
+        // Fetch ledger entries for this patient (financial history - immutable audit)
+        try {
+          const ledgerData = await getPatientLedger(patientId)
+          const ledgerArr = Array.isArray(ledgerData) ? ledgerData : ledgerData?.data ?? ledgerData?.rows ?? []
+          setLedgerEntries(ledgerArr)
+        } catch {
+          setLedgerEntries([])
+        }
+
+        // Fetch all lab entries across sessions for this patient
+        try {
+          const labData = await getPatientLabEntries(patientId)
+          const labArr = Array.isArray(labData) ? labData : labData?.data ?? labData?.rows ?? []
+          setLabEntries(labArr)
+        } catch {
+          setLabEntries([])
         }
       } catch (err) {
         console.error('PatientDetail load error:', err)
@@ -534,6 +563,173 @@ function PatientDetail() {
             onNavigateSession={(sid)=>{ setSelectedAppt(null); if(sid) navigate(`/sessions/edit/${sid}`)}}
           />
         )}
+
+        {/* Ledger History — financial audit trail, connected via patient */}
+        <section className="flex flex-col gap-4">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3">
+              <h2 className="text-2xl font-semibold tracking-normal text-slate-950">Financial Ledger</h2>
+              <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200">{ledgerEntries.length} entries</span>
+            </div>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <div className="inline-flex w-full overflow-x-auto rounded-lg border border-slate-200 bg-white p-1 shadow-sm sm:w-fit">
+                {['All','Charges','Payments'].map(opt=>(
+                  <button key={opt} type="button" onClick={()=>setLedgerFilter(opt)} className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${ledgerFilter===opt?'bg-teal-600 text-white shadow-sm':'text-slate-600 hover:bg-slate-50'}`}>{opt}</button>
+                ))}
+              </div>
+              <div className="inline-flex w-full overflow-x-auto rounded-lg border border-slate-200 bg-white p-1 shadow-sm sm:w-fit">
+                {['calendar','list'].map(v=>(
+                  <button key={v} type="button" onClick={()=>setLedgerView(v)} className={`rounded-md px-3 py-1.5 text-sm font-medium capitalize transition ${ledgerView===v?'bg-teal-600 text-white shadow-sm':'text-slate-600 hover:bg-slate-50'}`}>{v}</button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {ledgerView === 'calendar' ? (
+            <div className="grid gap-6 lg:grid-cols-3">
+              <div className="lg:col-span-2">
+                <LedgerCalendar
+                  entries={ledgerEntries}
+                  currentMonth={ledgerMonth}
+                  onMonthChange={setLedgerMonth}
+                  onSelectDate={()=>{}}
+                  selectedDate={null}
+                  onEntryClick={setSelectedLedgerEntry}
+                />
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                <h3 className="mb-3 font-semibold text-slate-900">Recent Entries</h3>
+                <div className="space-y-2 max-h-[60vh] overflow-y-auto">
+                  {ledgerEntries.length === 0 ? (
+                    <p className="py-8 text-center text-sm text-slate-500">No ledger entries yet</p>
+                  ) : (
+                    ledgerEntries.slice(0, 20).map(entry => (
+                      <button
+                        key={entry.id}
+                        type="button"
+                        onClick={() => setSelectedLedgerEntry(entry)}
+                        className="flex w-full items-center justify-between rounded-lg border border-slate-200 p-3 text-left hover:bg-slate-50"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-slate-900">
+                            <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ${
+                              entry.entry_type === 'charge' ? 'bg-amber-50 text-amber-700 ring-amber-200' :
+                              entry.entry_type === 'payment' ? 'bg-emerald-50 text-emerald-700 ring-emerald-200' :
+                              entry.entry_type === 'lab_fee' ? 'bg-sky-50 text-sky-700 ring-sky-200' :
+                              'bg-violet-50 text-violet-700 ring-violet-200'
+                            }`}>{entry.entry_type}</span>
+                          </p>
+                          {entry.description && <p className="mt-1 truncate text-xs text-slate-600">{entry.description}</p>}
+                          <p className="mt-0.5 text-xs text-slate-500">{formatDate(entry.entry_date)} {entry.session_id ? '· Session linked' : ''}</p>
+                        </div>
+                        <span className={`text-sm font-semibold ${(entry.entry_type === 'payment') ? 'text-emerald-700' : 'text-slate-900'}`}>
+                          {entry.entry_type === 'payment' ? '+' : '-'}₹{Number(entry.amount || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                        </span>
+                      </button>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : (
+            (() => {
+              const filtered = ledgerEntries.filter(e => {
+                if (ledgerFilter === 'Charges') return e.entry_type === 'charge' || e.entry_type === 'lab_fee'
+                if (ledgerFilter === 'Payments') return e.entry_type === 'payment'
+                return true
+              })
+              if (filtered.length === 0) return <div className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">No ledger entries in this view</div>
+              return (
+                <div className="space-y-3">
+                  {filtered.map(entry => (
+                    <button
+                      key={entry.id}
+                      type="button"
+                      onClick={() => setSelectedLedgerEntry(entry)}
+                      className="flex w-full items-center justify-between gap-4 rounded-lg border border-slate-200 bg-white p-4 text-left hover:bg-slate-50"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-slate-900">
+                          <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ${
+                            entry.entry_type === 'charge' ? 'bg-amber-50 text-amber-700 ring-amber-200' :
+                            entry.entry_type === 'payment' ? 'bg-emerald-50 text-emerald-700 ring-emerald-200' :
+                            entry.entry_type === 'lab_fee' ? 'bg-sky-50 text-sky-700 ring-sky-200' :
+                            'bg-violet-50 text-violet-700 ring-violet-200'
+                          }`}>{entry.entry_type}</span>
+                          {entry.description && <span className="ml-2 text-slate-600">{entry.description}</span>}
+                        </p>
+                        <p className="mt-1 text-xs text-slate-500">{formatDate(entry.entry_date)} {entry.session_id ? '· Session linked' : ''}</p>
+                      </div>
+                      <span className={`text-sm font-semibold ${(entry.entry_type === 'payment') ? 'text-emerald-700' : 'text-slate-900'}`}>
+                        {entry.entry_type === 'payment' ? '+' : '-'}₹{Number(entry.amount || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )
+            })()
+          )}
+        </section>
+
+        {selectedLedgerEntry && (
+          <LedgerDetailModal
+            entry={selectedLedgerEntry}
+            onClose={() => setSelectedLedgerEntry(null)}
+            onDelete={async (entry) => {
+              try {
+                await deleteLedgerEntry(patientId, entry.id)
+                showToast('Ledger entry deleted', 'success')
+                const data = await getPatientLedger(patientId)
+                const arr = Array.isArray(data) ? data : data?.data ?? []
+                setLedgerEntries(arr)
+                setSelectedLedgerEntry(null)
+              } catch (e) {
+                showToast(e.message, 'error')
+              }
+            }}
+            onNavigateSession={(sid) => {
+              setSelectedLedgerEntry(null)
+              if (sid) navigate(`/sessions/edit/${sid}`)
+            }}
+          />
+        )}
+
+        {/* Lab Entries — per-session lab/vendor records */}
+        <section className="flex flex-col gap-4">
+          <div className="flex items-center gap-3">
+            <h2 className="text-2xl font-semibold tracking-normal text-slate-950">Lab Entries</h2>
+            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200">{labEntries.length} entries</span>
+          </div>
+
+          {labEntries.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
+              No lab entries recorded for this patient
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {labEntries.map((entry) => (
+                <button
+                  key={entry.id}
+                  type="button"
+                  onClick={() => navigate(`/sessions/edit/${entry.session_id}`)}
+                  className="flex w-full items-center justify-between gap-4 rounded-lg border border-slate-200 bg-white p-4 text-left hover:bg-slate-50"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-slate-900">
+                      {entry.lab_vendor_name && <span className="rounded-full bg-sky-50 px-2 py-0.5 text-xs font-semibold text-sky-700 ring-1 ring-sky-200">{entry.lab_vendor_name}</span>}
+                      <span className="ml-2 text-slate-600">{entry.test_name}</span>
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {formatDate(entry.entry_date)} {entry.session_chief_complaint ? `· Session: ${entry.session_chief_complaint}` : ''}
+                    </p>
+                    {entry.notes && <p className="mt-1 truncate text-xs text-slate-600">{entry.notes}</p>}
+                  </div>
+                  <span className="text-sm font-semibold text-slate-900">₹{Number(entry.cost || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </section>
       </div>
     </main>
   )

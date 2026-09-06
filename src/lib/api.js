@@ -1,10 +1,7 @@
-const BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3001').replace(/\/$/, '')
-
-console.log('API Base URL:', BASE_URL, '| VITE_API_URL env:', import.meta.env.VITE_API_URL)
+const BASE_URL = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '')
 
 async function request(path, options = {}) {
   const url = `${BASE_URL}${path}`
-  console.log(`[API] ${options.method || 'GET'} ${url}`)
   let res
   try {
     res = await fetch(url, {
@@ -12,19 +9,15 @@ async function request(path, options = {}) {
       ...options,
     })
   } catch (networkErr) {
-    console.error(`[API] Network error for ${url}:`, networkErr)
-    // Surface URL in thrown error so toast shows it
-    throw new Error(`Failed to fetch ${url}: ${networkErr.message}. Is the backend running at ${BASE_URL}?`)
+    throw new Error(`Network error: ${networkErr.message}. Please check your connection and try again.`)
   }
   const text = await res.text()
   let data
   try { data = text ? JSON.parse(text) : null } catch { data = text }
   if (!res.ok) {
     const serverMsg = data && typeof data === 'object' && data.error ? data.error : (data?.message || text || `Request failed ${res.status}`)
-    console.error(`[API] ${res.status} ${url}:`, serverMsg, data)
     throw new Error(`${serverMsg} (${res.status} ${url})`)
   }
-  console.log(`[API] ${res.status} ${url} OK`)
   return data
 }
 
@@ -88,23 +81,19 @@ export async function uploadSessionFile(sessionId, file, metadata = {}) {
   form.append('file', file)
   if (metadata.description) form.append('description', metadata.description)
   const url = `${BASE_URL}/api/sessions/${sessionId}/files`
-  console.log(`[API] POST ${url} (multipart)`)
   let res
   try {
     res = await fetch(url, { method: 'POST', body: form })
   } catch (networkErr) {
-    console.error(`[API] Network error for ${url}:`, networkErr)
-    throw new Error(`Failed to fetch ${url}: ${networkErr.message}. Is the backend running at ${BASE_URL}?`)
+    throw new Error(`Upload failed: ${networkErr.message}. Please check your connection and try again.`)
   }
   const text = await res.text()
   let data
   try { data = text ? JSON.parse(text) : null } catch { data = text }
   if (!res.ok) {
     const serverMsg = data && typeof data === 'object' && data.error ? data.error : `Upload failed ${res.status}`
-    console.error(`[API] ${res.status} ${url}:`, serverMsg, data)
     throw new Error(`${serverMsg} (${res.status} ${url})`)
   }
-  console.log(`[API] ${res.status} ${url} OK`)
   return data
 }
 export function deleteSessionFile(fileId) { return request(`/api/files/${fileId}`, { method: 'DELETE' }) }
@@ -176,6 +165,9 @@ export function getLabEntries(sessionId) { return request(`/api/sessions/${sessi
 export function createLabEntry(sessionId, data) { return request(`/api/sessions/${sessionId}/lab-entries`, { method: 'POST', body: JSON.stringify(data) }) }
 export function updateLabEntry(sessionId, entryId, data) { return request(`/api/sessions/${sessionId}/lab-entries/${entryId}`, { method: 'PUT', body: JSON.stringify(data) }) }
 export function deleteLabEntry(sessionId, entryId) { return request(`/api/sessions/${sessionId}/lab-entries/${entryId}`, { method: 'DELETE' }) }
+
+// Patient Lab Entries (all across sessions)
+export function getPatientLabEntries(patientId) { return request(`/api/patients/${patientId}/lab-entries`) }
 
 // Patient Ledger (financial history - immutable audit)
 export function getPatientLedger(patientId, filters = {}) {

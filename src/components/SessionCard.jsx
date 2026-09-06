@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { format, parseISO } from 'date-fns'
 import {
   Calendar,
@@ -7,6 +7,7 @@ import {
   ExternalLink,
   Eye,
   FileText,
+  FlaskConical,
   Paperclip,
   Pencil,
   Syringe,
@@ -16,6 +17,7 @@ import {
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { CONSULTATION_FORMS } from '../lib/consultationForms'
+import { getLabEntries } from '../lib/api'
 
 const visitTypeStyles = {
   New: 'bg-blue-50 text-blue-700 ring-blue-200',
@@ -34,12 +36,22 @@ function SessionCard({ session, followupSession, onEdit, onDeleteFile }) {
   const navigate = useNavigate()
   const [showTreatment, setShowTreatment] = useState(false)
   const [viewConsultationForm, setViewConsultationForm] = useState(null)
-  const chartEntries = session.chartEntries || session.dental_chart_entries || []
+  const [labEntries, setLabEntries] = useState([])
   const doctors = session.doctors || []
   const files = session.files || session.session_files || []
   const consultationForms = session.consultationForms || session.consultation_forms || []
   const hasLongTreatment = (session.treatment_given || '').length > 140
   const isEdited = isDifferentDateTime(session.created_at, session.updated_at)
+
+  useEffect(() => {
+    if (!session.id) return
+    getLabEntries(session.id)
+      .then(data => {
+        const arr = Array.isArray(data) ? data : data?.data ?? data?.rows ?? []
+        setLabEntries(arr)
+      })
+      .catch(() => setLabEntries([]))
+  }, [session.id])
 
   const handleEdit = () => {
     if (onEdit) {
@@ -272,7 +284,6 @@ function SessionCard({ session, followupSession, onEdit, onDeleteFile }) {
             </div>
           </div>
         )}
-
         {/* Read-only consultation form modal */}
         {viewConsultationForm && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setViewConsultationForm(null)}>
@@ -297,6 +308,7 @@ function SessionCard({ session, followupSession, onEdit, onDeleteFile }) {
                     title={viewConsultationForm.form_label}
                   />
                 )}
+
                 <div>
                   <p className="text-sm font-medium text-slate-700 mb-2">Patient Signature</p>
                   <img
@@ -315,6 +327,40 @@ function SessionCard({ session, followupSession, onEdit, onDeleteFile }) {
                   Close
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {labEntries.length > 0 && (
+          <div className="space-y-2">
+            <p className="flex items-center gap-2 text-sm font-medium text-slate-700">
+              <FlaskConical className="h-4 w-4 text-sky-500" />
+              Lab Entries ({labEntries.length})
+              <span className="text-xs font-normal text-slate-500">Total: ₹{labEntries.reduce((s, e) => s + (Number(e.cost) || 0), 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span>
+            </p>
+            <div className="overflow-x-auto rounded-lg border border-slate-200">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 text-[10px] font-medium uppercase text-slate-500">
+                  <tr>
+                    <th className="px-2.5 py-1.5">Lab / Vendor</th>
+                    <th className="px-2.5 py-1.5">Test</th>
+                    <th className="px-2.5 py-1.5 text-right">Cost</th>
+                    <th className="px-2.5 py-1.5">Date</th>
+                    <th className="px-2.5 py-1.5">Notes</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {labEntries.map((entry) => (
+                    <tr key={entry.id} className="bg-white">
+                      <td className="px-2.5 py-1.5 font-medium text-slate-700">{entry.lab_vendor_name || '-'}</td>
+                      <td className="px-2.5 py-1.5 text-slate-700">{entry.test_name}</td>
+                      <td className="px-2.5 py-1.5 text-right font-medium text-slate-900">₹{formatMoney(entry.cost)}</td>
+                      <td className="px-2.5 py-1.5 text-slate-500">{entry.entry_date ? format(parseISO(String(entry.entry_date).split('T')[0]), 'dd MMM yyyy') : '-'}</td>
+                      <td className="max-w-[150px] truncate px-2.5 py-1.5 text-slate-500">{entry.notes || '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         )}

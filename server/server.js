@@ -20,6 +20,7 @@ import appointmentsRouter from './routes/appointments.js'
 import surgeryNotesRouter from './routes/surgeryNotes.js'
 import labEntriesRouter from './routes/labEntries.js'
 import patientLedgerRouter from './routes/patientLedger.js'
+import patientLabEntriesRouter from './routes/patientLabEntries.js'
 import sessionSurgeryFormsRouter from './routes/sessionSurgeryForms.js'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -50,6 +51,7 @@ app.use('/api/facial-bones', facialBonesRouter)
 app.use('/api/surgery-forms', surgeryFormsRouter)
 app.use('/api/appointments', appointmentsRouter)
 app.use('/api/patients/:patientId/ledger', patientLedgerRouter)
+app.use('/api/patients/:patientId/lab-entries', patientLabEntriesRouter)
 app.use('/api/sessions/:sessionId/surgery-notes', surgeryNotesRouter)
 app.use('/api/sessions/:sessionId/lab-entries', labEntriesRouter)
 app.use('/api/sessions/:sessionId/surgery-forms', sessionSurgeryFormsRouter)

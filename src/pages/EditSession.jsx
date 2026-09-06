@@ -13,6 +13,7 @@ import {
 import { useToast } from '../hooks/useToast'
 import { CONSULTATION_FORMS } from '../lib/consultationForms'
 import MasterSelect from '../components/MasterSelect'
+import LabEntryForm from '../components/LabEntryForm'
 import {
   getSession,
   getPatient,
@@ -31,8 +32,6 @@ import {
   createLocation,
   getFacialBones,
   createFacialBone,
-  getLabVendors,
-  createLabVendor,
   getSurgeryNotes,
   upsertSurgeryNotes,
   deleteSurgeryNotes,
@@ -74,7 +73,6 @@ function EditSession() {
   const [surgeryNotes, setSurgeryNotes] = useState('')
   const [facialBoneId, setFacialBoneId] = useState('')
   const [facialBoneNameSnapshot, setFacialBoneNameSnapshot] = useState('')
-  const [labVendorId, setLabVendorId] = useState('')
 
   const [age, setAge] = useState('')
   const [weight, setWeight] = useState('')
@@ -1088,9 +1086,9 @@ function EditSession() {
           </div>
 
           <div className="mb-4 rounded-xl border bg-white p-4">
-            <h2 className="mb-3 font-semibold">Lab / Vendor</h2>
-            <MasterSelect label="Lab / Vendor" value={labVendorId} onChange={setLabVendorId} fetchFn={getLabVendors} createFn={createLabVendor} placeholder="Select lab/vendor" />
-            <p className="mt-2 text-xs text-gray-500">Reusable vendor dropdown; historical references preserved, inactive hidden.</p>
+            <h2 className="mb-3 font-semibold">Lab Entries</h2>
+            <p className="mb-3 text-sm text-gray-600">Lab/vendor records linked to this session. Historical entries are preserved even if a lab is later deactivated.</p>
+            <LabEntryForm sessionId={sessionId} patientId={patientId} />
           </div>
 
           <div className="mb-4 rounded-xl border bg-white p-4">

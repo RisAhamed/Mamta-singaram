@@ -16,6 +16,7 @@ router.post('/', async (req,res)=>{
     const { sessionId } = req.params
     const { test_name, cost, entry_date, notes, lab_vendor_id } = req.body
     if(!test_name || !String(test_name).trim()) return res.status(400).json({error:'test_name is required'})
+    if(cost!==undefined && cost!=='' && (isNaN(Number(cost)) || Number(cost) < 0)) return res.status(400).json({error:'cost must be a non-negative number'})
     const sess=await pool.query('SELECT patient_id FROM sessions WHERE id=$1',[sessionId])
     if(!sess.rows.length) return res.status(404).json({error:'Session not found'})
     const patient_id=sess.rows[0].patient_id

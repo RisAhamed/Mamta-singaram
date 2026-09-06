@@ -9,7 +9,7 @@ router.get('/', async (req,res)=>{
     const { from, to } = req.query
     const cond=['patient_id = $1']; const vals=[patientId]; let i=2
     if(from){ cond.push(`entry_date >= $${i}`); vals.push(from); i++}
-    if(to){ cond.push(`entry_date <= $${i}`); vals.push(to); i++}
+    if(to){ cond.push(`entry_date <= $${i}`); vals.push(to.includes('T') ? to : to+'T23:59:59Z'); i++}
     const sql=`SELECT * FROM patient_ledger_entries WHERE ${cond.join(' AND ')} ORDER BY entry_date DESC, created_at DESC`
     const r=await pool.query(sql, vals)
     res.json(r.rows)
