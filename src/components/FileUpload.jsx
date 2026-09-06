@@ -292,7 +292,7 @@ const FileUpload = forwardRef(function FileUpload({
                     {formatFileSize(file.file_size_bytes)}
                   </p>
                 </div>
-                <div className="flex items-center gap-1.5 shrink-0">
+                <div className="flex flex-wrap items-center gap-1.5 shrink-0">
                   <button
                     type="button"
                     onClick={() => onOpenFile?.(file)}

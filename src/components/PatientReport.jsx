@@ -172,7 +172,7 @@ export default function PatientReport({ patient, sessions, appointments, ledgerE
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="flex max-h-[90vh] w-full max-w-3xl flex-col rounded-xl bg-white shadow-2xl">
         {/* Header */}
-        <div className="flex items-center justify-between border-b px-6 py-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b px-6 py-4">
           <div className="flex items-center gap-3">
             <FileText className="h-5 w-5 text-teal-600" />
             <div>
@@ -188,7 +188,7 @@ export default function PatientReport({ patient, sessions, appointments, ledgerE
         {!showPreview ? (
           /* Section Selection */
           <div className="flex-1 overflow-y-auto px-6 py-4">
-            <div className="mb-4 flex items-center justify-between">
+            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-sm text-slate-600">Select sections to include in the report:</p>
               <div className="flex gap-2">
                 <button type="button" onClick={selectAll} className="rounded-md border border-slate-200 px-3 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50">Select All</button>
@@ -299,7 +299,7 @@ export default function PatientReport({ patient, sessions, appointments, ledgerE
               {/* Vital Signs */}
               {selected.vital_signs && hasContent('vital_signs') && (
                 <Section title="Vital Signs">
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                     {patient?.age && <div><span className="text-xs text-slate-500">Age</span><p className="font-medium">{patient.age} yrs</p></div>}
                     {patient?.weight && <div><span className="text-xs text-slate-500">Weight</span><p className="font-medium">{patient.weight} kg</p></div>}
                     {patient?.blood_pressure && <div><span className="text-xs text-slate-500">BP</span><p className="font-medium">{patient.blood_pressure}</p></div>}
@@ -315,7 +315,7 @@ export default function PatientReport({ patient, sessions, appointments, ledgerE
                 <Section title="Session History">
                   {sessions.map((session, i) => (
                     <div key={session.id} className="mb-4 rounded border border-slate-200 p-3 last:mb-0">
-                      <div className="mb-2 flex items-center justify-between">
+                      <div className="mb-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <span className="font-semibold">Session {i + 1} &mdash; {formatDateShort(session.visit_date)}</span>
                         <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium">{session.visit_type || 'Visit'}</span>
                       </div>
@@ -471,7 +471,7 @@ export default function PatientReport({ patient, sessions, appointments, ledgerE
         )}
 
         {/* Footer Actions */}
-        <div className="flex items-center justify-between border-t px-6 py-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-t px-6 py-3">
           {!showPreview ? (
             <>
               <p className="text-xs text-slate-500">{activeSections.length} of {SECTION_DEFINITIONS.length} sections selected</p>

@@ -173,7 +173,7 @@ function Patients() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-50 px-4 py-6 text-slate-950 sm:px-6 lg:px-8">
+    <main className="min-h-0 bg-slate-50 px-4 py-6 text-slate-950 sm:px-6 lg:px-8">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
         <header className="flex flex-col gap-4 border-b border-slate-200 pb-5 sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -187,7 +187,7 @@ function Patients() {
           <button
             type="button"
             onClick={openAddModal}
-            className="inline-flex items-center justify-center gap-2 rounded-md bg-teal-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2"
+            className="inline-flex items-center justify-center gap-2 rounded-md bg-teal-600 px-4 py-3 text-sm font-medium text-white shadow-sm transition hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2"
           >
             <Plus className="h-4 w-4" />
             Add Patient
@@ -502,7 +502,7 @@ function Patients() {
               {/* Vital Signs */}
               <div className="mt-6 bg-white border border-gray-200 rounded-xl p-5">
                 <h3 className="text-sm font-semibold text-gray-700 mb-4">Vital Signs</h3>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
                     <label className="block text-sm font-medium text-slate-800 mb-1">Age (years)</label>
                     <input

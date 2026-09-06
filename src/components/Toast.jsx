@@ -66,7 +66,7 @@ function ToastProvider({ children }) {
   return (
     <ToastContext.Provider value={value}>
       {children}
-      <div className="fixed bottom-5 right-5 z-[100] flex w-[calc(100vw-2.5rem)] max-w-sm flex-col gap-3">
+      <div className="fixed inset-x-4 bottom-4 sm:inset-x-auto sm:right-5 sm:bottom-5 z-[100] flex w-auto sm:w-[calc(100vw-2.5rem)] sm:max-w-sm flex-col gap-3 pb-[env(safe-area-inset-bottom)]">
         {toasts.map((toast) => (
           <ToastItem key={toast.id} toast={toast} onDismiss={dismissToast} />
         ))}

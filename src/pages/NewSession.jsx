@@ -507,7 +507,7 @@ function NewSession() {
         </div>
 
         <Section title="Visit Info">
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-2">
             <ReadOnlyField
               label="Patient"
               value={
@@ -629,7 +629,7 @@ function NewSession() {
         </Section>
 
         <Section title="Clinical Details">
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-2">
             <Field label="Chief Complaint" name="chief_complaint" required className="lg:col-span-2">
               <textarea
                 id="chief_complaint"
@@ -718,7 +718,7 @@ function NewSession() {
         </Section>
 
         <Section title="Dental Chart Entries">
-          <div className="grid gap-4 lg:grid-cols-4">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <Field label="Region" name="region">
               <select
                 id="region"
@@ -831,7 +831,7 @@ function NewSession() {
                         setConsultationModalForm(form)
                         setModalHasRead(false)
                       }}
-                      className={`inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-sm font-medium ring-1 transition focus:outline-none focus:ring-2 focus:ring-teal-500 ${
+                      className={`inline-flex items-center gap-1.5 rounded-full px-3 py-2.5 text-sm font-medium ring-1 transition focus:outline-none focus:ring-2 focus:ring-teal-500 ${
                         isAttached
                           ? 'bg-teal-600 text-white ring-teal-600'
                           : 'bg-slate-100 text-slate-700 ring-slate-200 hover:bg-slate-200'
@@ -993,7 +993,7 @@ function NewSession() {
                     key={doctor.id}
                     type="button"
                     onClick={() => toggleDoctor(doctor.id)}
-                    className={`rounded-full px-3 py-2 text-sm font-medium ring-1 transition focus:outline-none focus:ring-2 focus:ring-teal-500 ${
+                    className={`rounded-full px-3 py-2.5 text-sm font-medium ring-1 transition focus:outline-none focus:ring-2 focus:ring-teal-500 ${
                       selected
                         ? 'bg-teal-600 text-white ring-teal-600'
                         : 'bg-slate-100 text-slate-700 ring-slate-200 hover:bg-slate-200'
@@ -1041,7 +1041,7 @@ function NewSession() {
         </Section>
 
         <Section title="Additional Notes & Next Visit">
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-2">
             <Field label="Additional Notes" name="notes">
               <textarea
                 id="notes"
@@ -1143,7 +1143,7 @@ function ReadOnlyField({ label, value }) {
   return (
     <div>
       <p className="block text-sm font-medium text-slate-700">{label}</p>
-      <div className="mt-1 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-800">
+      <div className="mt-1 rounded-md border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-medium text-slate-800">
         {value}
       </div>
     </div>
@@ -1176,11 +1176,11 @@ function CurrencyField({ label, name, value, onChange }) {
 
 
 const inputClassName =
-  'mt-1 block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20'
+  'mt-1 block w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-950 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20'
 
 
 const textareaClassName =
-  'mt-1 block w-full resize-y rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20'
+  'mt-1 block w-full resize-y rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-950 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20'
 
 
 function formatDate(dateValue) {

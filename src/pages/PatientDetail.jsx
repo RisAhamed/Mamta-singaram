@@ -270,7 +270,7 @@ function PatientDetail() {
                   <button
                     type="button"
                     onClick={() => navigate(`/patients/${patient.id}/edit`)}
-                    className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50"
+                    className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-3 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50"
                   >
                     <Pencil className="h-3.5 w-3.5" />
                     Edit Patient
@@ -278,7 +278,7 @@ function PatientDetail() {
                   <button
                     type="button"
                     onClick={() => setShowReport(true)}
-                    className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50"
+                    className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-3 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50"
                   >
                     <FileText className="h-3.5 w-3.5" />
                     Generate Report
@@ -369,7 +369,7 @@ function PatientDetail() {
             {(patient.age || patient.weight || patient.blood_pressure || patient.blood_sugar || patient.pulse_rate || patient.spo2) && (
               <div className="mt-4 pt-4 border-t border-gray-100">
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Vital Signs</p>
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-6">
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
                   {patient.age && (
                     <div className="bg-blue-50 rounded-lg px-3 py-2 text-center">
                       <p className="text-xs text-gray-400">Age</p>
@@ -473,7 +473,7 @@ function PatientDetail() {
                   key={option.value}
                   type="button"
                   onClick={() => setActiveFilter(option.value)}
-                  className={`rounded-md px-3 py-1.5 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-teal-500 ${
+                  className={`rounded-md px-3 py-2.5 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-teal-500 ${
                     activeFilter === option.value
                       ? 'bg-teal-600 text-white shadow-sm'
                       : 'text-slate-600 hover:bg-slate-50'
@@ -525,7 +525,7 @@ function PatientDetail() {
             </div>
             <div className="inline-flex w-full overflow-x-auto rounded-lg border border-slate-200 bg-white p-1 shadow-sm sm:w-fit">
               {['All','Upcoming','Past'].map(opt=>(
-                <button key={opt} type="button" onClick={()=>setApptFilter(opt)} className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${apptFilter===opt?'bg-teal-600 text-white shadow-sm':'text-slate-600 hover:bg-slate-50'}`}>{opt}</button>
+                <button key={opt} type="button" onClick={()=>setApptFilter(opt)} className={`rounded-md px-3 py-2.5 text-sm font-medium transition ${apptFilter===opt?'bg-teal-600 text-white shadow-sm':'text-slate-600 hover:bg-slate-50'}`}>{opt}</button>
               ))}
             </div>
           </div>
@@ -585,12 +585,12 @@ function PatientDetail() {
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               <div className="inline-flex w-full overflow-x-auto rounded-lg border border-slate-200 bg-white p-1 shadow-sm sm:w-fit">
                 {['All','Charges','Payments'].map(opt=>(
-                  <button key={opt} type="button" onClick={()=>setLedgerFilter(opt)} className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${ledgerFilter===opt?'bg-teal-600 text-white shadow-sm':'text-slate-600 hover:bg-slate-50'}`}>{opt}</button>
+                  <button key={opt} type="button" onClick={()=>setLedgerFilter(opt)} className={`rounded-md px-3 py-2.5 text-sm font-medium transition ${ledgerFilter===opt?'bg-teal-600 text-white shadow-sm':'text-slate-600 hover:bg-slate-50'}`}>{opt}</button>
                 ))}
               </div>
               <div className="inline-flex w-full overflow-x-auto rounded-lg border border-slate-200 bg-white p-1 shadow-sm sm:w-fit">
                 {['calendar','list'].map(v=>(
-                  <button key={v} type="button" onClick={()=>setLedgerView(v)} className={`rounded-md px-3 py-1.5 text-sm font-medium capitalize transition ${ledgerView===v?'bg-teal-600 text-white shadow-sm':'text-slate-600 hover:bg-slate-50'}`}>{v}</button>
+                  <button key={v} type="button" onClick={()=>setLedgerView(v)} className={`rounded-md px-3 py-2.5 text-sm font-medium capitalize transition ${ledgerView===v?'bg-teal-600 text-white shadow-sm':'text-slate-600 hover:bg-slate-50'}`}>{v}</button>
                 ))}
               </div>
             </div>

@@ -128,7 +128,7 @@ export default function Appointments(){
           <h1 className="text-2xl font-bold text-slate-900">Appointments</h1>
           <p className="mt-1 text-sm text-slate-500">Today · Week · Month — click a slot to book</p>
         </div>
-        <button type="button" onClick={()=>openCreate(selectedDate,'')} className="inline-flex items-center gap-2 rounded-md bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700"><Plus className="h-4 w-4"/> New Appointment</button>
+        <button type="button" onClick={()=>openCreate(selectedDate,'')} className="inline-flex flex-wrap items-center gap-2 rounded-md bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700"><Plus className="h-4 w-4"/> New Appointment</button>
       </div>
 
       {/* View toggle */}
@@ -138,7 +138,7 @@ export default function Appointments(){
             <button key={v} type="button" onClick={()=>setView(v)} className={`rounded-md px-4 py-1.5 text-sm font-medium capitalize transition ${view===v?'bg-teal-600 text-white shadow-sm':'text-slate-600 hover:bg-slate-50'}`}>{v}</button>
           ))}
         </div>
-        <div className="ml-auto flex items-center gap-1">
+        <div className="ml-auto flex flex-wrap items-center gap-1">
           <button type="button" onClick={()=>setCurrentDate(subMonths(currentDate,1))} className={`rounded-md border bg-white px-3 py-1.5 text-sm ${view!=='month'?'hidden':''}`}>‹ Prev</button>
           <button type="button" onClick={()=>setCurrentDate(new Date())} className="rounded-md border bg-white px-3 py-1.5 text-sm">Today</button>
           <button type="button" onClick={()=>setCurrentDate(addMonths(currentDate,1))} className={`rounded-md border bg-white px-3 py-1.5 text-sm ${view!=='month'?'hidden':''}`}>Next ›</button>
@@ -258,7 +258,7 @@ export default function Appointments(){
               )}
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <label className="block text-sm">Date *<input type="date" value={form.appointment_date} onChange={e=>setForm({...form, appointment_date:e.target.value})} className="mt-1 w-full rounded border px-3 py-2 text-sm" required/></label>
               <label className="block text-sm">Time <span className="text-xs text-slate-400">({form.appointment_time ? formatTime12(form.appointment_time):'—'})</span><input type="time" value={form.appointment_time} onChange={e=>setForm({...form, appointment_time:e.target.value})} step="900" className="mt-1 w-full rounded border px-3 py-2 text-sm"/></label>
             </div>

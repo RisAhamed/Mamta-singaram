@@ -41,9 +41,9 @@ export default function AppointmentDayTimeline({ date, appointments = [], onAppo
 
   return (
     <div className="rounded-xl border bg-white shadow-sm">
-      <div className="border-b px-4 py-3 flex items-center justify-between">
+      <div className="border-b px-4 py-3 flex flex-wrap items-center justify-between gap-2">
         <h3 className="font-semibold text-slate-900">{format(date, 'EEEE, dd MMM yyyy')}</h3>
-        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">{sorted.length} appts</span>
+        <span className="rounded-full bg-slate-100 px-2.5 py-2 text-xs font-medium text-slate-700">{sorted.length} appts</span>
       </div>
       <div className="max-h-[60vh] overflow-y-auto">
         {displayHours.map(({ h, label }) => {
@@ -76,7 +76,7 @@ export default function AppointmentDayTimeline({ date, appointments = [], onAppo
                   <button
                     type="button"
                     onClick={() => onSlotClick && onSlotClick(date, `${String(h).padStart(2, '0')}:00`)}
-                    className="w-full rounded border border-dashed border-slate-200 py-1 text-xs text-slate-400 hover:border-teal-300 hover:text-teal-600"
+                    className="w-full rounded border border-dashed border-slate-200 py-2 text-xs text-slate-400 hover:border-teal-300 hover:text-teal-600"
                   >
                     + Book {label}
                   </button>

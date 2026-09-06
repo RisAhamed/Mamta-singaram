@@ -67,7 +67,7 @@ export default function AppointmentWeekView({ currentDate, appointments = [], on
                           {a.appointment_time ? formatTime12(a.appointment_time).replace(':00 ', ' ') + ' ' : ''}{a.title || 'Appt'}
                         </button>
                       ))}
-                      <button type="button" onClick={() => onSlotClick(d, `${String(h).padStart(2, '0')}:00`)} className="hidden w-full rounded border border-dashed py-0.5 text-[10px] text-slate-300 hover:border-teal-300 hover:text-teal-500 group-hover:block sm:block">
+                      <button type="button" onClick={() => onSlotClick(d, `${String(h).padStart(2, '0')}:00`)} className="flex w-full rounded border border-dashed py-1.5 text-[10px] justify-center text-slate-300 hover:border-teal-300 hover:text-teal-500 group-hover:block sm:block">
                         +
                       </button>
                     </div>

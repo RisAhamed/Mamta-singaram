@@ -72,7 +72,7 @@ export default function AppointmentCalendar({ appointments = [], currentMonth, o
                   <span
                     key={a.id}
                     onClick={(e)=>{ e.stopPropagation(); onAppointmentClick && onAppointmentClick(a)}}
-                    className={`block truncate rounded px-1 py-0.5 text-[10px] font-medium text-white ${statusColor[a.status]||'bg-slate-500'}`}
+                    className={`block truncate rounded px-1.5 py-1 text-[10px] font-medium text-white ${statusColor[a.status]||'bg-slate-500'}`}
                     title={`${a.title||''} ${a.appointment_time||''} ${a.status}`}
                   >
                     {a.appointment_time ? `${(() => { const [h,m]=String(a.appointment_time).slice(0,5).split(':'); let hr=Number(h)%12; if(hr===0) hr=12; return `${hr}:${m} ${Number(h)>=12?'PM':'AM'}` })()} ` : ''}{a.title || 'Appt'}

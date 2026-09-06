@@ -36,7 +36,7 @@ export default function LedgerDetailModal({ entry, onClose, onDelete, onNavigate
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-lg rounded-xl bg-white shadow-2xl"
+        className="w-full max-w-lg max-h-[90vh] flex flex-col rounded-xl bg-white shadow-2xl"
       >
         <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
           <div className="flex items-center gap-3">
@@ -53,7 +53,7 @@ export default function LedgerDetailModal({ entry, onClose, onDelete, onNavigate
           </button>
         </div>
 
-        <div className="px-6 py-4 space-y-4">
+        <div className="px-6 py-4 space-y-4 overflow-y-auto flex-1">
           <div className="flex items-center justify-between rounded-lg bg-slate-50 p-4">
             <span className="text-sm text-slate-600">Amount</span>
             <span className={`text-xl font-bold ${(entry.entry_type === 'payment') ? 'text-emerald-700' : 'text-slate-900'}`}>
@@ -61,7 +61,7 @@ export default function LedgerDetailModal({ entry, onClose, onDelete, onNavigate
             </span>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <p className="text-xs font-medium uppercase text-slate-500">Entry Type</p>
               <span className={`mt-1 inline-block rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${config.color}`}>
@@ -97,7 +97,7 @@ export default function LedgerDetailModal({ entry, onClose, onDelete, onNavigate
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-4 border-t border-slate-100 pt-3">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 border-t border-slate-100 pt-3">
             <div>
               <p className="text-xs font-medium uppercase text-slate-500">Created</p>
               <p className="mt-1 text-xs text-slate-600">{formatDateTime(entry.created_at)}</p>
@@ -109,7 +109,7 @@ export default function LedgerDetailModal({ entry, onClose, onDelete, onNavigate
           </div>
         </div>
 
-        <div className="flex items-center justify-between border-t border-slate-200 px-6 py-4">
+        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between border-t border-slate-200 px-6 py-4">
           <button
             type="button"
             onClick={() => {

@@ -100,7 +100,7 @@ function Search() {
   const showEmptyState = debouncedQuery.length >= 2 && !loading && patients.length === 0
 
   return (
-    <main className="mx-auto flex w-full max-w-6xl flex-col gap-6">
+    <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 sm:px-0">
       <header>
         <h2 className="text-3xl font-semibold tracking-normal text-slate-950">
           Search Patients

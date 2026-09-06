@@ -55,7 +55,7 @@ function AppLayout() {
   const closeMobileSidebar = () => setMobileSidebarOpen(false)
 
   return (
-    <div className="h-screen overflow-hidden bg-slate-50 text-slate-950">
+    <div className="min-h-screen bg-slate-50 text-slate-950 md:h-screen md:overflow-hidden">
       <aside
         className={`fixed inset-y-0 left-0 z-40 hidden flex-col bg-slate-950 text-white transition-all duration-300 ease-in-out md:flex ${
           sidebarOpen ? 'w-60' : 'w-16'
@@ -94,7 +94,7 @@ function AppLayout() {
             <button
               type="button"
               onClick={closeMobileSidebar}
-              className="rounded-md p-2 text-slate-300 transition hover:bg-white/10 hover:text-white focus:outline-none focus:ring-2 focus:ring-teal-400"
+              className="rounded-md p-3 text-slate-300 transition hover:bg-white/10 hover:text-white focus:outline-none focus:ring-2 focus:ring-teal-400"
               aria-label="Close sidebar"
             >
               <PanelLeftClose className="h-5 w-5" />
@@ -123,7 +123,7 @@ function AppLayout() {
             <button
               type="button"
               onClick={() => setMobileSidebarOpen(true)}
-              className="rounded-md p-2 text-slate-600 transition hover:bg-slate-100 hover:text-slate-950 focus:outline-none focus:ring-2 focus:ring-teal-500 md:hidden"
+              className="rounded-md p-3 text-slate-600 transition hover:bg-slate-100 hover:text-slate-950 focus:outline-none focus:ring-2 focus:ring-teal-500 md:hidden"
               aria-label="Open sidebar"
             >
               <Menu className="h-5 w-5" />
@@ -141,8 +141,8 @@ function AppLayout() {
           <div className="hidden md:block" />
         </header>
 
-        <main className="h-screen overflow-y-auto pt-16">
-          <div className="p-4 sm:p-6">
+        <main className="min-h-[calc(100vh-4rem)] overflow-y-auto pt-16 md:h-screen">
+          <div className="p-4 sm:p-6 pb-[max(1rem,env(safe-area-inset-bottom))]">
             <Outlet />
           </div>
         </main>
@@ -167,7 +167,7 @@ function SidebarContent({ expanded, onNavigate, onToggle, currentPath, consultat
         <button
           type="button"
           onClick={onToggle}
-          className="rounded-md p-2 text-slate-300 transition hover:bg-white/10 hover:text-white focus:outline-none focus:ring-2 focus:ring-teal-400"
+          className="rounded-md p-3 text-slate-300 transition hover:bg-white/10 hover:text-white focus:outline-none focus:ring-2 focus:ring-teal-400"
           aria-label={expanded ? 'Collapse sidebar' : 'Expand sidebar'}
         >
           <ToggleIcon className="h-5 w-5" />

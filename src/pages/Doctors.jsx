@@ -163,7 +163,7 @@ function Doctors() {
           </button>
         </header>
 
-        <section className="flex items-center gap-2">
+        <section className="flex flex-wrap items-center gap-2">
           {[
             { value: 'all', label: 'All' },
             { value: 'active', label: 'Active' },
@@ -325,7 +325,7 @@ function Doctors() {
 
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4 py-6">
-          <div className="w-full max-w-xl rounded-lg bg-white shadow-xl">
+          <div className="w-full max-w-xl max-h-[90vh] flex flex-col rounded-lg bg-white shadow-xl">
             <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
               <h2 className="text-lg font-semibold tracking-normal text-slate-950">
                 {editingDoctor ? 'Edit Doctor' : 'Add Doctor'}
@@ -340,7 +340,7 @@ function Doctors() {
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-4 px-6 py-5">
+            <form onSubmit={handleSubmit} className="space-y-4 px-6 py-5 overflow-y-auto flex-1">
               <div>
                 <label htmlFor="name" className="block text-sm font-medium text-slate-700">
                   Full Name <span className="text-rose-600">*</span>

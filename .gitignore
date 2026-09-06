@@ -31,4 +31,5 @@ dev-server*
 backend.out.log
 backend.*.log
 .env*
-.env.*
+.env.production
+.env.production

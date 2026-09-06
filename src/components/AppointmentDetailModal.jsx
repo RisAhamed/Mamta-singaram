@@ -39,13 +39,13 @@ export default function AppointmentDetailModal({ appointment, onClose, onStatusC
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
-      <div className="relative w-full max-w-lg rounded-xl bg-white shadow-2xl" onClick={e=>e.stopPropagation()}>
+      <div className="relative w-full max-w-lg max-h-[90vh] flex flex-col rounded-xl bg-white shadow-2xl" onClick={e=>e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
           <h3 className="text-lg font-semibold text-slate-900">{appointment.title || 'Appointment'}</h3>
           <button type="button" onClick={onClose} className="rounded-md p-1 text-slate-400 hover:bg-slate-100"><X className="h-5 w-5"/></button>
         </div>
 
-        <div className="space-y-4 p-6">
+        <div className="space-y-4 p-6 overflow-y-auto flex-1">
           <div className="flex flex-wrap gap-2">
             <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ring-1 ${statusBadge[appointment.status]||'bg-slate-100 text-slate-700 ring-slate-200'}`}>{appointment.status}</span>
             {appointment.location_name && <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700 ring-1 ring-slate-200"><MapPin className="h-3 w-3"/>{appointment.location_name}</span>}
@@ -54,7 +54,7 @@ export default function AppointmentDetailModal({ appointment, onClose, onStatusC
           <div className="space-y-3 text-sm">
             <p className="flex items-center gap-2 text-slate-700"><User className="h-4 w-4 text-slate-400"/>{patientName || appointment.patient_id} <button type="button" onClick={()=>onNavigatePatient && onNavigatePatient(appointment.patient_id)} className="text-xs font-medium text-teal-600 hover:underline">View patient</button></p>
             <p className="flex items-center gap-2 text-slate-700"><Calendar className="h-4 w-4 text-slate-400"/>{formatDate(appointment.appointment_date)} {appointment.appointment_time && <span className="inline-flex items-center gap-1"><Clock className="h-3.5 w-3.5"/>{String(appointment.appointment_time).slice(0,5)}</span>}</p>
-            {appointment.notes && <p className="flex gap-2 text-slate-700"><FileText className="h-4 w-4 mt-0.5 text-slate-400"/><span>{appointment.notes}</span></p>}
+            {appointment.notes && <p className="flex gap-2 text-slate-700"><FileText className="h-4 w-4 mt-0.5 shrink-0 text-slate-400"/><span className="break-words break-all">{appointment.notes}</span></p>}
             {appointment.session_id && (
               <p className="flex items-center gap-2 text-sm">
                 <span className="text-slate-600">Related session:</span>
@@ -69,7 +69,7 @@ export default function AppointmentDetailModal({ appointment, onClose, onStatusC
             <div className="flex flex-wrap gap-2 border-t border-slate-100 pt-4">
               <span className="text-xs font-medium text-slate-600">Change status:</span>
               {['Scheduled','Completed','Cancelled','No-Show'].map(s=>(
-                <button key={s} type="button" onClick={()=>onStatusChange(appointment, s)} className={`rounded-full px-3 py-1 text-xs font-medium ring-1 ${appointment.status===s?'bg-teal-600 text-white ring-teal-600':'bg-white text-slate-700 ring-slate-200 hover:bg-slate-50'}`}>{s}</button>
+                <button key={s} type="button" onClick={()=>onStatusChange(appointment, s)} className={`rounded-full px-3 py-2 text-xs font-medium ring-1 ${appointment.status===s?'bg-teal-600 text-white ring-teal-600':'bg-white text-slate-700 ring-slate-200 hover:bg-slate-50'}`}>{s}</button>
               ))}
             </div>
           )}

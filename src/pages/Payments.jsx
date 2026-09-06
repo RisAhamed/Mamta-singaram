@@ -92,7 +92,7 @@ function Payments() {
   }
 
   return (
-    <main className="mx-auto max-w-4xl px-2 py-6 sm:px-6">
+    <main className="mx-auto max-w-4xl px-4 py-6 sm:px-6">
       <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-normal text-slate-900">
@@ -149,7 +149,7 @@ function Payments() {
                   <p className="text-xs text-gray-400 mt-0.5">
                     {s.patient?.phone} · {s.visit_date || '—'}
                   </p>
-                  <p className="text-xs text-gray-500 mt-0.5 truncate max-w-xs">{s.chief_complaint}</p>
+                  <p className="text-xs text-gray-500 mt-0.5 truncate max-w-full sm:max-w-xs">{s.chief_complaint}</p>
                   <div className="flex items-center gap-3 mt-1">
                     <span className="text-xs text-gray-400">
                       Total: ₹{cost.toLocaleString('en-IN')}
@@ -159,7 +159,7 @@ function Payments() {
                     </span>
                   </div>
                 </div>
-                <div className="text-right flex items-center gap-4 ml-4">
+                <div className="text-right flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 sm:ml-4 w-full sm:w-auto">
                   <div>
                     <p className="text-xs text-gray-400">Due</p>
                     <p className="text-lg font-bold text-red-600">
