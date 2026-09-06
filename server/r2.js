@@ -9,7 +9,7 @@ import { fileURLToPath } from 'url'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
-// Load environment variables from .env if it exists (skip on Render where env vars are set in dashboard)
+// Load environment variables from .env if it exists (on Vercel they come from dashboard)
 try {
   const envPath = path.resolve(__dirname, '../.env')
   if (fs.existsSync(envPath)) {

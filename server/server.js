@@ -27,7 +27,7 @@ import sessionSurgeryFormsRouter from './routes/sessionSurgeryForms.js'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
-// Load environment variables from .env if it exists (skip on Render where env vars are set in dashboard)
+// Load environment variables from .env if it exists (on Vercel they come from dashboard)
 try {
   const envPath = path.resolve(__dirname, '../.env')
   if (fs.existsSync(envPath)) {
@@ -37,22 +37,25 @@ try {
 
 const app = express()
 
-// CORS: allow frontend domain in production, all origins in development
-const allowedOrigins = [
-  'https://mamtasingaram.vercel.app',
-  'http://localhost:5173',
-  'http://localhost:3001',
-]
-app.use(cors({
-  origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true)
-    } else {
-      callback(null, true) // Allow all in development; restrict in production if needed
-    }
-  },
-  credentials: true,
-}))
+// CORS: not needed for same-origin Vercel deployment (frontend and /api share origin).
+// Applied when ALLOWED_ORIGINS is set, or automatically for localhost cross-port dev.
+const allowedOriginsEnv = (process.env.ALLOWED_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean)
+// Always allow localhost for local cross-port development (5173 -> 3001)
+const devOrigins = !process.env.VERCEL ? ['http://localhost:5173', 'http://localhost:3000', 'http://localhost:3001'] : []
+const allowedOrigins = [...new Set([...allowedOriginsEnv, ...devOrigins])]
+if (allowedOrigins.length > 0) {
+  app.use(cors({
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true)
+      } else {
+        callback(new Error('Not allowed by CORS'))
+      }
+    },
+    credentials: true,
+  }))
+}
+
 app.use(express.json())
 
 app.get('/api/health', async (req, res) => {
@@ -85,8 +88,13 @@ app.use('/api/sessions/:sessionId/files', sessionFilesRouter)
 app.use('/api/files', filesRouter)
 app.use('/api/sessions', sessionsRouter)
 
-const PORT = process.env.PORT || 3001
+export default app
 
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`)
-})
+// Only listen when running as a standalone server (local dev).
+// On Vercel the app is imported via api/index.js and handled as a serverless function.
+if (!process.env.VERCEL) {
+  const PORT = process.env.PORT || 3001
+  app.listen(PORT, () => {
+    console.log(`Server running on http://localhost:${PORT}`)
+  })
+}

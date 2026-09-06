@@ -8,7 +8,7 @@ import { fileURLToPath } from 'url'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
-// Load environment variables from .env if it exists (skip on Render/Vercel where env vars are set in dashboard)
+// Load environment variables from .env if it exists (on Vercel they come from dashboard)
 try {
   const envPath = path.resolve(__dirname, '../.env')
   if (fs.existsSync(envPath)) {
@@ -21,7 +21,7 @@ const { Pool } = pg
 function resolveConnectionString() {
   const connectionString = process.env.DATABASE_URL?.trim()
   if (!connectionString) {
-    throw new Error('DATABASE_URL is missing. Set it in .env (local) or in your hosting dashboard (Render, etc.).')
+    throw new Error('DATABASE_URL is missing. Set it in .env (local) or in Vercel dashboard.')
   }
   if (connectionString.includes('<ENTER-SQL-USER-PASSWORD>')) {
     throw new Error('DATABASE_URL is still the placeholder value.')
