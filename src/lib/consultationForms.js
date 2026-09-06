@@ -1,13 +1,13 @@
-export const CONSULTATION_FORMS = [
-  { id: 'restoration', label: 'Restoration', file: '/consultation-forms/restoration.pdf' },
-  { id: 'root_canal', label: 'Root Canal Treatment', file: '/consultation-forms/root-canal-treatment.pdf' },
-  { id: 'post_endodontic', label: 'Post Endodontic Restorations', file: '/consultation-forms/post-endodontic-restorations.pdf' },
-  { id: 'endodontic_surgery', label: 'Endodontic Surgery', file: '/consultation-forms/endodontic-surgery.pdf' },
-  { id: 'esthetic', label: 'Esthetic Procedures', file: '/consultation-forms/esthetic-procedures.pdf' },
-  { id: 'periodontics_scaling_root_planing', label: 'Scaling and Root Planing Consent', file: '/consultation-forms/Clear_Periodontics_Scaling_Root_Planing_Consent_Form.pdf' },
-  { id: 'periodontics_informed_consent', label: 'Periodontics Informed Consent', file: '/consultation-forms/Periodontics_Consent_Form.pdf.pdf' },
-  { id: 'tooth_extraction', label: 'Tooth Extraction', file: '/consultation-forms/tooth-extraction.pdf' },
-]
+// Consultation form registry — data-driven, future-ready
+// Feature architecture is preserved. Current content is temporarily unavailable.
+// To add a new consultation form in the future:
+// 1. Place the new document (PDF) in public/consultation-forms/
+// 2. Add an entry: { id: 'unique_id', label: 'Display Label', file: '/consultation-forms/your-file.pdf' }
+// 3. The sidebar and session UI will automatically expose it (opens in new tab via target="_blank").
+//
+// Current state: no valid consultation-form document is configured. UI handles empty list gracefully
+// with an unavailable/placeholder state instead of broken links.
+export const CONSULTATION_FORMS = []
 
 export function validateSignatureFile(file) {
   const MAX_SIZE = 512000 // 0.5MB

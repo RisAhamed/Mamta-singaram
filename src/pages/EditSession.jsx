@@ -782,39 +782,47 @@ function EditSession() {
             ))}
           </div>
 
-          {/* ── Consultation Forms ─────────────────────────────────── */}
+          {/* ── Consultation Forms — data-driven, future-ready (backend preserved, content temporarily unavailable) ── */}
           <div className="mb-4 rounded-xl border bg-white p-4">
             <h2 className="mb-3 font-semibold">Consultation Forms</h2>
-            <p className="mb-3 text-sm text-gray-600">
-              Select consultation forms acknowledged by the patient.
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {CONSULTATION_FORMS.map((form) => {
-                const isSaved = savedConsultationForms.some((s) => s.form_type === form.id)
-                const isPending = pendingConsultationForms.some((p) => p.formId === form.id)
-                const isAttached = isSaved || isPending
-                return (
-                  <button
-                    key={form.id}
-                    type="button"
-                    onClick={() => {
-                      if (isAttached) return
-                      setConsultationModalForm(form)
-                      setModalHasRead(false)
-                    }}
-                    className={`inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-sm font-medium ring-1 transition focus:outline-none focus:ring-2 focus:ring-teal-500 ${
-                      isAttached
-                        ? 'bg-teal-600 text-white ring-teal-600'
-                        : 'bg-slate-100 text-slate-700 ring-slate-200 hover:bg-slate-200'
-                    }`}
-                  >
-                    {isAttached && <Check className="h-3.5 w-3.5" />}
-                    <FileText className="h-3.5 w-3.5" />
-                    {form.label}
-                  </button>
-                )
-              })}
-            </div>
+            {CONSULTATION_FORMS.length === 0 ? (
+              <p className="text-sm text-slate-500">
+                No consultation forms currently configured. Historical consultation records remain accessible below. A new form can be added later without restructuring — it will automatically appear here and open in a new tab.
+              </p>
+            ) : (
+              <>
+                <p className="mb-3 text-sm text-gray-600">
+                  Select consultation forms acknowledged by the patient. Each form opens in a new tab to keep this session page open.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {CONSULTATION_FORMS.map((form) => {
+                    const isSaved = savedConsultationForms.some((s) => s.form_type === form.id)
+                    const isPending = pendingConsultationForms.some((p) => p.formId === form.id)
+                    const isAttached = isSaved || isPending
+                    return (
+                      <button
+                        key={form.id}
+                        type="button"
+                        onClick={() => {
+                          if (isAttached) return
+                          setConsultationModalForm(form)
+                          setModalHasRead(false)
+                        }}
+                        className={`inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-sm font-medium ring-1 transition focus:outline-none focus:ring-2 focus:ring-teal-500 ${
+                          isAttached
+                            ? 'bg-teal-600 text-white ring-teal-600'
+                            : 'bg-slate-100 text-slate-700 ring-slate-200 hover:bg-slate-200'
+                        }`}
+                      >
+                        {isAttached && <Check className="h-3.5 w-3.5" />}
+                        <FileText className="h-3.5 w-3.5" />
+                        {form.label}
+                      </button>
+                    )
+                  })}
+                </div>
+              </>
+            )}
 
             {/* Saved (existing) consultation forms */}
             {savedConsultationForms.length > 0 && (
@@ -930,6 +938,11 @@ function EditSession() {
                   </button>
                 </div>
                 <div className="p-6 space-y-5">
+                  <div className="flex justify-end">
+                    <a href={consultationModalForm.file} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-teal-700 hover:text-teal-800">
+                      <FileText className="h-4 w-4" /> Open in new tab
+                    </a>
+                  </div>
                   <iframe
                     src={consultationModalForm.file}
                     style={{ width: '100%', height: '70vh', border: 'none' }}

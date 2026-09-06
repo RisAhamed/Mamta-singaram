@@ -20,10 +20,9 @@ const navigationItems = [
   { label: 'Payments', path: '/payments', icon: IndianRupee },
 ]
 
-const prescriptionPads = [
-  { label: 'Dr. Ashok MDS', doctorId: 'ashok' },
-  { label: 'Dr. Mamta', doctorId: 'mamta' },
-]
+// Prescription pads — architecture preserved, content temporarily hidden (future-ready)
+// To restore: populate this array and the sidebar will re-expose it automatically.
+const prescriptionPads = []
 
 const routeTitles = [
   { matcher: /^\/$/, title: 'Dashboard' },
@@ -252,55 +251,62 @@ function SidebarNav({ onNavigate, expanded = false, currentPath = '', consultati
           Consultation forms
         </div>
         <div className="space-y-1 px-1">
-          {consultationForms.map((form) => (
-            <a
-              key={form.file}
-              href={form.file}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={() => onNavigate()}
-              aria-label={form.label}
-              className={`group relative flex w-full items-center rounded-md px-3 py-2 text-sm font-medium transition ${expanded ? 'justify-start gap-3' : 'justify-center'} text-slate-300 hover:bg-white/10 hover:text-white`}
-            >
-              <FileText className="h-5 w-5 shrink-0" />
-              <span className={expanded ? 'inline' : 'hidden'}>{form.label}</span>
-              {!expanded && (
-                <span className="pointer-events-none absolute left-full top-1/2 z-50 ml-3 hidden -translate-y-1/2 whitespace-nowrap rounded-md bg-slate-900 px-2.5 py-1.5 text-xs font-medium text-white opacity-0 shadow-lg transition group-hover:opacity-100 md:block">
-                  {form.label}
-                </span>
-              )}
-            </a>
-          ))}
-        </div>
-
-      </div>
-
-      <div className="mt-4 border-t border-white/5 pt-4">
-        <div className={`mb-2 px-2 text-xs font-semibold uppercase text-slate-400 ${expanded ? 'block' : 'hidden'}`}>
-          Prescription pads
-        </div>
-        <div className="space-y-1 px-1">
-          {prescriptionPads.map((pad) => (
-            <a
-              key={pad.doctorId}
-              href={`/prescription/${pad.doctorId}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={() => onNavigate()}
-              aria-label={pad.label}
-              className={`group relative flex w-full items-center rounded-md px-3 py-2 text-sm font-medium transition ${expanded ? 'justify-start gap-3' : 'justify-center'} text-slate-300 hover:bg-white/10 hover:text-white`}
-            >
-              <FileText className="h-5 w-5 shrink-0" />
-              <span className={expanded ? 'inline' : 'hidden'}>{pad.label}</span>
-              {!expanded && (
-                <span className="pointer-events-none absolute left-full top-1/2 z-50 ml-3 hidden -translate-y-1/2 whitespace-nowrap rounded-md bg-slate-900 px-2.5 py-1.5 text-xs font-medium text-white opacity-0 shadow-lg transition group-hover:opacity-100 md:block">
-                  {pad.label}
-                </span>
-              )}
-            </a>
-          ))}
+          {consultationForms.length === 0 ? (
+            <p className={`px-3 py-2 text-xs text-slate-500 ${expanded ? 'block' : 'hidden'}`}>
+              No consultation forms currently configured.
+            </p>
+          ) : (
+            consultationForms.map((form) => (
+              <a
+                key={form.file}
+                href={form.file}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => onNavigate()}
+                aria-label={form.label}
+                className={`group relative flex w-full items-center rounded-md px-3 py-2 text-sm font-medium transition ${expanded ? 'justify-start gap-3' : 'justify-center'} text-slate-300 hover:bg-white/10 hover:text-white`}
+              >
+                <FileText className="h-5 w-5 shrink-0" />
+                <span className={expanded ? 'inline' : 'hidden'}>{form.label}</span>
+                {!expanded && (
+                  <span className="pointer-events-none absolute left-full top-1/2 z-50 ml-3 hidden -translate-y-1/2 whitespace-nowrap rounded-md bg-slate-900 px-2.5 py-1.5 text-xs font-medium text-white opacity-0 shadow-lg transition group-hover:opacity-100 md:block">
+                    {form.label}
+                  </span>
+                )}
+              </a>
+            ))
+          )}
         </div>
       </div>
+
+      {prescriptionPads.length > 0 && (
+        <div className="mt-4 border-t border-white/5 pt-4">
+          <div className={`mb-2 px-2 text-xs font-semibold uppercase text-slate-400 ${expanded ? 'block' : 'hidden'}`}>
+            Prescription pads
+          </div>
+          <div className="space-y-1 px-1">
+            {prescriptionPads.map((pad) => (
+              <a
+                key={pad.doctorId}
+                href={`/prescription/${pad.doctorId}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => onNavigate()}
+                aria-label={pad.label}
+                className={`group relative flex w-full items-center rounded-md px-3 py-2 text-sm font-medium transition ${expanded ? 'justify-start gap-3' : 'justify-center'} text-slate-300 hover:bg-white/10 hover:text-white`}
+              >
+                <FileText className="h-5 w-5 shrink-0" />
+                <span className={expanded ? 'inline' : 'hidden'}>{pad.label}</span>
+                {!expanded && (
+                  <span className="pointer-events-none absolute left-full top-1/2 z-50 ml-3 hidden -translate-y-1/2 whitespace-nowrap rounded-md bg-slate-900 px-2.5 py-1.5 text-xs font-medium text-white opacity-0 shadow-lg transition group-hover:opacity-100 md:block">
+                    {pad.label}
+                  </span>
+                )}
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
     </nav>
   )
 }

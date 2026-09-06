@@ -21,6 +21,8 @@ const doctorsData = {
   }
 };
 
+const PRESCRIPTION_AVAILABLE = false // Temporarily hidden — architecture preserved, content unavailable
+
 function PrescriptionPad() {
     const { doctorId } = useParams();
     const billRef = useRef(null);
@@ -520,6 +522,25 @@ function PrescriptionPad() {
             }
         }
     };
+
+    // Temporarily hidden content — keep hooks above, render placeholder instead of bill
+    if (!PRESCRIPTION_AVAILABLE) {
+      return (
+        <div className="prescription-pad-page">
+          <div className="toolbar">
+            <div className="toolbar-brand">AK MULTI SPECIALITY DENTAL CLINIC</div>
+          </div>
+          <div className="app-shell">
+            <div className="mx-auto max-w-2xl rounded-xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+              <h2 className="text-lg font-semibold text-slate-900">Prescription pad — temporarily unavailable</h2>
+              <p className="mt-2 text-sm text-slate-600">
+                Prescription content is currently being updated. The underlying structure and routes are preserved and will be restored when new requirements are available. Existing patient and session data remain unaffected.
+              </p>
+            </div>
+          </div>
+        </div>
+      )
+    }
 
     return (
         <div className="prescription-pad-page">
