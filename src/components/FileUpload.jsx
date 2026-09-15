@@ -3,7 +3,7 @@ import { Paperclip, Trash2, X, Loader2, AlertCircle, RotateCcw } from 'lucide-re
 import { validateSessionFile, formatFileSize, uploadSessionFile } from '../lib/api'
 
 const ALLOWED_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/heic', 'image/heif']
-const MAX_SIZE_BYTES = 512000
+const MAX_SIZE_BYTES = 5242880
 
 const FileUpload = forwardRef(function FileUpload({
   existingFiles = [],
@@ -146,7 +146,7 @@ const FileUpload = forwardRef(function FileUpload({
       <p className="text-xs text-slate-500">
         {required && <span className="text-rose-600">*</span>}
         {required ? ' Required' : ''} — at least one photo/document is required for new sessions.
-        Allowed: PDF/JPG/PNG. Maximum file size: 0.5 MB per file. You can add multiple files.
+        Allowed: PDF/JPG/PNG. Maximum file size: 5 MB per file. You can add multiple files.
         <span className="hidden sm:inline"> On iPhone, tap to take a photo or choose from library.</span>
       </p>
 

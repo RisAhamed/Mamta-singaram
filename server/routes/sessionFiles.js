@@ -5,7 +5,7 @@ import { uploadFile, deleteFile, getFileUrl } from '../r2.js'
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 512000 },
+  limits: { fileSize: 5242880 },
   fileFilter: (req, file, cb) => {
     const allowed = ['application/pdf', 'image/jpeg', 'image/png', 'image/heic', 'image/heif']
     if (!allowed.includes(file.mimetype)) return cb(new Error('Unsupported file type: ' + file.mimetype))
@@ -41,7 +41,7 @@ router.post('/', (req, res, next) => {
     if (err) {
       console.error('Multer upload error:', err.message)
       if (err.code === 'LIMIT_FILE_SIZE') {
-        return res.status(400).json({ error: 'File too large. Max 0.5 MB' })
+        return res.status(400).json({ error: 'File too large. Maximum file size is 5 MB.' })
       }
       return res.status(400).json({ error: err.message })
     }
@@ -83,7 +83,7 @@ router.post('/', (req, res, next) => {
     res.status(201).json(result.rows[0])
   } catch (err) {
     console.error('POST session files error:', err.message)
-    if (err.code === 'LIMIT_FILE_SIZE') return res.status(400).json({ error: 'File too large. Max 0.5 MB' })
+    if (err.code === 'LIMIT_FILE_SIZE') return res.status(400).json({ error: 'File too large. Maximum file size is 5 MB.' })
     res.status(500).json({ error: err.message })
   }
 })

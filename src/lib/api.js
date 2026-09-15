@@ -245,15 +245,15 @@ export function formatFileSize(bytes) {
 }
 export function validateSessionFile(file) {
   const ALLOWED_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/heic', 'image/heif']
-  const MAX_SIZE_BYTES = 512000
+  const MAX_SIZE_BYTES = 5242880
   if (!file) return { valid: false, message: 'No file selected.', error: 'No file selected.' }
   if (!ALLOWED_TYPES.includes(file.type)) {
     const msg = `Unsupported file type: ${file.type || 'unknown'}. Allowed: PDF, JPG, PNG, HEIC, HEIF.`
     return { valid: false, message: msg, error: msg }
   }
-  if (file.size >= MAX_SIZE_BYTES) {
+  if (file.size > MAX_SIZE_BYTES) {
     const sizeMB = (file.size / (1024 * 1024)).toFixed(2)
-    const msg = `File too large (${sizeMB} MB). Maximum allowed is less than 0.5 MB.`
+    const msg = `File too large (${sizeMB} MB). Maximum file size is 5 MB.`
     return { valid: false, message: msg, error: msg }
   }
   return { valid: true, message: '', error: '' }
