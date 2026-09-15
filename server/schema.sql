@@ -297,6 +297,52 @@ CREATE INDEX IF NOT EXISTS idx_lab_entries_vendor ON lab_entries(lab_vendor_id);
 CREATE INDEX IF NOT EXISTS idx_lab_entries_status ON lab_entries(status);
 CREATE INDEX IF NOT EXISTS idx_lab_entries_entry_date ON lab_entries(entry_date);
 CREATE INDEX IF NOT EXISTS idx_lab_entries_required_date ON lab_entries(required_date);
+-- consent_forms (master - stable logical consent documents, file replaceable)
+CREATE TABLE consent_forms (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  key TEXT UNIQUE NOT NULL,
+  title TEXT NOT NULL,
+  description TEXT,
+  file_path TEXT NOT NULL,
+  storage_path TEXT,
+  is_active BOOLEAN DEFAULT true,
+  display_order INTEGER DEFAULT 0,
+  version INTEGER DEFAULT 1,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- session_consent_forms (per-session acknowledgement, preserves historical snapshot)
+CREATE TABLE session_consent_forms (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  session_id UUID NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+  patient_id UUID NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+  consent_form_id UUID REFERENCES consent_forms(id) ON DELETE SET NULL,
+  consent_key TEXT,
+  consent_title TEXT,
+  file_path TEXT,
+  patient_name TEXT NOT NULL,
+  acknowledged BOOLEAN DEFAULT false,
+  acknowledged_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(session_id, consent_form_id)
+);
+
+-- Seed consent_forms (stable logical documents, file replaceable without UI change)
+INSERT INTO consent_forms (key, title, file_path, display_order) VALUES
+  ('clear_aligner_treatment', 'Clear Aligner Treatment', '/consent_forms/Clear-Aligner-Treatment-2.pdf', 1),
+  ('consent_general_1', 'General Consent', '/consent_forms/Consent+1.pdf', 2),
+  ('fixed_prosthodontic_crowns_bridges', 'Fixed Prosthodontic Treatment (Crowns and Bridges)', '/consent_forms/Fixed Prosthodontic Treatment (Crowns and Bridges).pdf', 3),
+  ('ida_endo', 'Endodontic Treatment (IDA)', '/consent_forms/IDA - Endo.pdf', 4),
+  ('ida_pediatric', 'Pediatric Treatment (IDA)', '/consent_forms/IDA - Pediatric.pdf', 5),
+  ('ida_pedo', 'Pediatric Treatment (IDA) - Pedo', '/consent_forms/IDA - Pedo.pdf', 6),
+  ('obstructive_sleep_apnea', 'Obstructive Sleep Apnea', '/consent_forms/Obstructive-Sleep-Apnea.pdf', 7),
+  ('oral_maxillofacial_surgery', 'Oral and Maxillofacial Surgery Consent', '/consent_forms/ORAL AND MAXILLOFACIAL SURGERY CONSENT.pdf', 8),
+  ('oral_maxillofacial_implant_surgery', 'Dental Implant Surgery Consent', '/consent_forms/ORAL_MAXILLOFACIAL SURGERY CONSENT FOR DENTAL IMPLANT SURGERY.pdf', 9),
+  ('sinus_lift_consent', 'Sinus Lift Consent', '/consent_forms/Sinus-Lift-Consent.pdf', 10)
+ON CONFLICT (key) DO NOTHING;
+
 CREATE INDEX IF NOT EXISTS idx_surgery_notes_session ON surgery_notes(session_id);
 CREATE INDEX IF NOT EXISTS idx_surgery_notes_patient ON surgery_notes(patient_id);
 CREATE INDEX IF NOT EXISTS idx_ledger_patient ON patient_ledger_entries(patient_id);
@@ -307,3 +353,8 @@ CREATE INDEX IF NOT EXISTS idx_lab_vendors_name ON lab_vendors(name);
 CREATE INDEX IF NOT EXISTS idx_facial_bones_name ON facial_bones(name);
 CREATE INDEX IF NOT EXISTS idx_surgery_forms_active ON surgery_forms(is_active);
 CREATE INDEX IF NOT EXISTS idx_session_surgery_forms_session ON session_surgery_forms(session_id);
+CREATE INDEX IF NOT EXISTS idx_consent_forms_active ON consent_forms(is_active);
+CREATE INDEX IF NOT EXISTS idx_consent_forms_key ON consent_forms(key);
+CREATE INDEX IF NOT EXISTS idx_session_consent_forms_session ON session_consent_forms(session_id);
+CREATE INDEX IF NOT EXISTS idx_session_consent_forms_patient ON session_consent_forms(patient_id);
+CREATE INDEX IF NOT EXISTS idx_session_consent_forms_consent ON session_consent_forms(consent_form_id);

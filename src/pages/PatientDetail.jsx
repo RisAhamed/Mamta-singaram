@@ -14,6 +14,12 @@ import SessionCard from '../components/SessionCard'
 import { useToast } from '../hooks/useToast'
 import {
   getPatient,
+  createAppointment,
+  createLabEntry,
+  getLabVendors,
+  createLabVendor,
+  getLocations,
+  createLocation,
   getSessions,
   getSession,
   getSessionFiles,
@@ -26,6 +32,7 @@ import {
   getPatientLabEntries,
 } from '../lib/api'
 import AppointmentDetailModal from '../components/AppointmentDetailModal'
+import MasterSelect from '../components/MasterSelect'
 import LedgerCalendar from '../components/LedgerCalendar'
 import LedgerDetailModal from '../components/LedgerDetailModal'
 import PatientReport from '../components/PatientReport'
@@ -57,6 +64,10 @@ function PatientDetail() {
   const [ledgerFilter, setLedgerFilter] = useState('All')
   const [selectedLedgerEntry, setSelectedLedgerEntry] = useState(null)
   const [labEntries, setLabEntries] = useState([])
+  const [showAddAppt, setShowAddAppt] = useState(false)
+  const [showAddLab, setShowAddLab] = useState(false)
+  const [apptForm, setApptForm] = useState({ appointment_date:'', appointment_time:'', title:'', notes:'', location_id:'' })
+  const [labForm, setLabForm] = useState({ session_id:'', lab_vendor_id:'', test_name:'', cost:'', amount_paid:'', entry_date:'', required_date:'', status:'Ordered', notes:'' })
   const [showReport, setShowReport] = useState(false)
 
   useEffect(() => {
@@ -308,6 +319,10 @@ function PatientDetail() {
                 <Plus className="h-4 w-4" />
                 Add New Session
               </button>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button type="button" onClick={()=>setShowAddAppt(true)} className="inline-flex items-center gap-1 rounded-lg border border-teal-300 bg-teal-50 px-3 py-1.5 text-sm font-medium text-teal-700 hover:bg-teal-100">+ Add Appointment</button>
+                <button type="button" onClick={()=>setShowAddLab(true)} className="inline-flex items-center gap-1 rounded-lg border border-sky-300 bg-sky-50 px-3 py-1.5 text-sm font-medium text-sky-700 hover:bg-sky-100">+ Add Lab Entry</button>
+              </div>
             </div>
 
             <div className="mt-6 grid gap-4 border-t border-slate-100 pt-5 lg:grid-cols-3">
@@ -521,6 +536,7 @@ function PatientDetail() {
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3">
               <h2 className="text-2xl font-semibold tracking-normal text-slate-950">Appointment History</h2>
+              <button type="button" onClick={()=>setShowAddAppt(true)} className="ml-auto rounded-lg border border-teal-200 bg-white px-3 py-1.5 text-xs font-medium text-teal-700 hover:bg-teal-50">+ Add</button>
               <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200">{appointments.length} appts</span>
             </div>
             <div className="inline-flex w-full overflow-x-auto rounded-lg border border-slate-200 bg-white p-1 shadow-sm sm:w-fit">
@@ -709,6 +725,8 @@ function PatientDetail() {
         <section className="flex flex-col gap-4">
           <div className="flex items-center gap-3">
             <h2 className="text-2xl font-semibold tracking-normal text-slate-950">Lab Entries</h2>
+            <span className="flex-1" />
+            <button type="button" onClick={()=>setShowAddLab(true)} className="ml-auto rounded-lg border border-sky-200 bg-white px-3 py-1.5 text-xs font-medium text-sky-700 hover:bg-sky-50">+ Add</button>
             <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200">{labEntries.length} entries</span>
           </div>
 
@@ -743,6 +761,34 @@ function PatientDetail() {
         </section>
       </div>
 
+      {showAddAppt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={()=>setShowAddAppt(false)}>
+          <form onClick={e=>e.stopPropagation()} onSubmit={async (e)=>{e.preventDefault(); if(!apptForm.appointment_date) return showToast('Date required','warning'); try{ await createAppointment({patient_id: patientId, appointment_date: apptForm.appointment_date, appointment_time: apptForm.appointment_time||null, title: apptForm.title.trim()||null, notes: apptForm.notes.trim()||null, location_id: apptForm.location_id||null, status:'Scheduled'}); showToast('Appointment created','success'); setShowAddAppt(false); setApptForm({appointment_date:'',appointment_time:'',title:'',notes:'',location_id:''}); const data=await getAppointments({patient_id: patientId}); setAppointments(Array.isArray(data)?data:data?.data??[])}catch(err){showToast(err.message,'error')}}} className="w-full max-w-md rounded-xl bg-white p-6 shadow-2xl space-y-3">
+            <h3 className="font-semibold">Add Appointment — {patient.full_name}</h3>
+            <input type="date" value={apptForm.appointment_date} onChange={e=>setApptForm({...apptForm, appointment_date:e.target.value})} className="w-full rounded border px-3 py-2 text-sm" required />
+            <input type="time" value={apptForm.appointment_time} onChange={e=>setApptForm({...apptForm, appointment_time:e.target.value})} className="w-full rounded border px-3 py-2 text-sm" />
+            <input value={apptForm.title} onChange={e=>setApptForm({...apptForm, title:e.target.value})} placeholder="Title (optional)" className="w-full rounded border px-3 py-2 text-sm" />
+            <MasterSelect label="Location" value={apptForm.location_id} onChange={v=>setApptForm({...apptForm, location_id:v})} fetchFn={getLocations} createFn={createLocation} placeholder="Select location" />
+            <textarea value={apptForm.notes} onChange={e=>setApptForm({...apptForm, notes:e.target.value})} rows={2} placeholder="Notes" className="w-full rounded border px-3 py-2 text-sm" />
+            <div className="flex justify-end gap-2"><button type="button" onClick={()=>setShowAddAppt(false)} className="rounded border px-4 py-2 text-sm">Cancel</button><button type="submit" className="rounded bg-teal-600 px-4 py-2 text-sm font-medium text-white">Create</button></div>
+          </form>
+        </div>
+      )}
+      {showAddLab && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 overflow-y-auto" onClick={()=>setShowAddLab(false)}>
+          <form onClick={e=>e.stopPropagation()} onSubmit={async (e)=>{e.preventDefault(); if(!labForm.session_id) return showToast('Select session','warning'); if(!labForm.test_name.trim()) return showToast('Product required','warning'); if(labForm.cost!=='' && Number(labForm.cost)<0) return showToast('Cost invalid','warning'); if(Number(labForm.amount_paid||0)>Number(labForm.cost||0)) return showToast('Paid cannot exceed cost','warning'); try{ await createLabEntry(labForm.session_id, {test_name: labForm.test_name.trim(), lab_vendor_id: labForm.lab_vendor_id||null, cost: labForm.cost==='' ? 0 : Number(labForm.cost), amount_paid: labForm.amount_paid==='' ? 0 : Number(labForm.amount_paid), entry_date: labForm.entry_date||null, required_date: labForm.required_date||null, status: labForm.status||'Ordered', notes: labForm.notes.trim()||null}); showToast('Lab entry created','success'); setShowAddLab(false); setLabForm({session_id:'',lab_vendor_id:'',test_name:'',cost:'',amount_paid:'',entry_date:'',required_date:'',status:'Ordered',notes:''}); const data=await getPatientLabEntries(patientId); setLabEntries(Array.isArray(data)?data:data?.data??[])}catch(err){showToast(err.message,'error')}}} className="my-4 w-full max-w-lg rounded-xl bg-white p-6 shadow-2xl space-y-3 max-h-[90vh] overflow-y-auto">
+            <h3 className="font-semibold">Add Lab Entry — {patient.full_name}</h3>
+            <label className="block text-sm">Session *<select value={labForm.session_id} onChange={e=>setLabForm({...labForm, session_id:e.target.value})} className="mt-1 w-full rounded border px-3 py-2 text-sm" required><option value="">Select session</option>{sessions.map(s=> <option key={s.id} value={s.id}>{s.visit_date?.slice(0,10)} — {s.chief_complaint} ({s.visit_type})</option>)}</select></label>
+            <MasterSelect label="Lab / Vendor" value={labForm.lab_vendor_id} onChange={v=>setLabForm({...labForm, lab_vendor_id:v})} fetchFn={getLabVendors} createFn={createLabVendor} placeholder="Select lab/vendor" />
+            <input value={labForm.test_name} onChange={e=>setLabForm({...labForm, test_name:e.target.value})} placeholder="Product / Lab Work *" className="w-full rounded border px-3 py-2 text-sm" required />
+            <div className="grid grid-cols-2 gap-3"><input type="date" value={labForm.entry_date} onChange={e=>setLabForm({...labForm, entry_date:e.target.value})} className="w-full rounded border px-3 py-2 text-sm" placeholder="Order Date" /><input type="date" value={labForm.required_date} onChange={e=>setLabForm({...labForm, required_date:e.target.value})} className="w-full rounded border px-3 py-2 text-sm" placeholder="Required Date" /></div>
+            <div className="grid grid-cols-2 gap-3"><input type="number" min="0" step="0.01" value={labForm.cost} onChange={e=>setLabForm({...labForm, cost:e.target.value})} placeholder="Cost" className="w-full rounded border px-3 py-2 text-sm" /><input type="number" min="0" step="0.01" value={labForm.amount_paid} onChange={e=>setLabForm({...labForm, amount_paid:e.target.value})} placeholder="Amount Paid" className="w-full rounded border px-3 py-2 text-sm" /></div>
+            <select value={labForm.status} onChange={e=>setLabForm({...labForm, status:e.target.value})} className="w-full rounded border px-3 py-2 text-sm"><option>Ordered</option><option>Received</option><option>Cancelled</option></select>
+            <textarea value={labForm.notes} onChange={e=>setLabForm({...labForm, notes:e.target.value})} rows={2} placeholder="Notes" className="w-full rounded border px-3 py-2 text-sm" />
+            <div className="flex justify-end gap-2"><button type="button" onClick={()=>setShowAddLab(false)} className="rounded border px-4 py-2 text-sm">Cancel</button><button type="submit" className="rounded bg-teal-600 px-4 py-2 text-sm font-medium text-white">Create</button></div>
+          </form>
+        </div>
+      )}
       {showReport && (
         <PatientReport
           patient={patient}

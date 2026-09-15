@@ -13,6 +13,7 @@ import { useToast } from '../hooks/useToast'
 import { CONSULTATION_FORMS } from '../lib/consultationForms'
 import MasterSelect from '../components/MasterSelect'
 import LabEntryForm from '../components/LabEntryForm'
+import SessionConsentSection from '../components/SessionConsentSection'
 import FileUpload from '../components/FileUpload'
 import {
   getSession,
@@ -1124,6 +1125,12 @@ function EditSession() {
             <h2 className="mb-3 font-semibold">Lab Entries</h2>
             <p className="mb-3 text-sm text-gray-600">Lab/vendor records linked to this session. Historical entries are preserved even if a lab is later deactivated.</p>
             <LabEntryForm sessionId={sessionId} patientId={patientId} />
+          </div>
+
+          <div className="mb-4 rounded-xl border bg-white p-4">
+            <h2 className="mb-3 font-semibold">Consent Forms</h2>
+            <p className="mb-3 text-sm text-gray-600">Select the relevant consent form, open the PDF in a new tab, confirm patient name and acknowledge.</p>
+            <SessionConsentSection sessionId={sessionId} patientName={patientName} />
           </div>
 
           <div className="mb-4 rounded-xl border bg-white p-4">

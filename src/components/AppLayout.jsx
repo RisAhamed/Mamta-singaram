@@ -20,6 +20,7 @@ const navigationItems = [
   { label: 'Patients', path: '/patients', icon: Users },
   { label: 'Appointments', path: '/appointments', icon: CalendarDays },
   { label: 'Laboratory', path: '/labs', icon: FlaskConical },
+  { label: 'Consent Forms', path: '/consent-forms', icon: FileText },
   { label: 'Doctors', path: '/doctors', icon: Stethoscope },
   { label: 'Payments', path: '/payments', icon: IndianRupee },
 ]
@@ -36,6 +37,7 @@ const routeTitles = [
   { matcher: /^\/patients$/, title: 'Patients' },
   { matcher: /^\/appointments$/, title: 'Appointments' },
   { matcher: /^\/labs(\/.*)?$/, title: 'Laboratory' },
+  { matcher: /^\/consent-forms$/, title: 'Consent Forms' },
   { matcher: /^\/doctors$/, title: 'Doctors' },
   { matcher: /^\/payments$/, title: 'Payments' },
   { matcher: /^\/search$/, title: 'Search' },

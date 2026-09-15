@@ -28,6 +28,8 @@ import {
   getLabVendors,
   createLabVendor,
   upsertSurgeryNotes,
+  getConsentForms,
+  acknowledgeConsentForm,
 } from '../lib/api'
 
 
@@ -110,6 +112,14 @@ function NewSession() {
   const [consultationModalForm, setConsultationModalForm] = useState(null)
   const [modalHasRead, setModalHasRead] = useState(false)
 
+  // ── Consent Forms state (pending for new session) ──
+  const [consentForms, setConsentForms] = useState([])
+  const [pendingConsents, setPendingConsents] = useState([])
+  const [consentSelectedId, setConsentSelectedId] = useState('')
+  const [consentPatientName, setConsentPatientName] = useState('')
+  const [consentAcknowledged, setConsentAcknowledged] = useState(false)
+  const [consentError, setConsentError] = useState('')
+
   // ── Master-data dropdowns ──
   const [locationId, setLocationId] = useState('')
   const [surgeryNotes, setSurgeryNotes] = useState('')
@@ -157,6 +167,17 @@ function NewSession() {
     return () => window.clearTimeout(timer)
   }, [formData.amount_paid, formData.treatment_cost])
 
+
+  useEffect(() => {
+    getConsentForms(true).then(d=> setConsentForms(Array.isArray(d)?d: d?.data ?? [])).catch(()=>{})
+  }, [])
+
+  useEffect(() => {
+    if (patient?.full_name && !consentPatientName) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setConsentPatientName(patient.full_name)
+    }
+  }, [patient, consentPatientName])
 
   useEffect(() => {
     const loadPatient = async () => {
@@ -455,6 +476,16 @@ function NewSession() {
           )
           return
         }
+      }
+
+      // Save pending consent acknowledgements
+      if (pendingConsents.length > 0) {
+        try {
+          for (const pc of pendingConsents) {
+            await acknowledgeConsentForm(targetSessionId, { consent_form_id: pc.consent_form_id, patient_name: pc.patient_name, acknowledged: true })
+          }
+          setPendingConsents([])
+        } catch (e) { console.error('consent save failed', e); showToast(e.message, 'warning') }
       }
 
       showToast('Session saved successfully.', 'success')
@@ -974,6 +1005,31 @@ function NewSession() {
         <Section title="Lab / Vendor">
           <MasterSelect label="Lab / Vendor" value={labVendorId} onChange={setLabVendorId} fetchFn={getLabVendors} createFn={createLabVendor} placeholder="Select lab/vendor" />
           <p className="mt-2 text-xs text-slate-500">This demonstrates reusable vendor dropdown; historical references preserved, inactive hidden.</p>
+        </Section>
+
+        <Section title="Consent Forms">
+          <p className="mb-3 text-sm text-slate-600">Select consent form, open PDF in new tab, confirm patient name and acknowledge. Opening alone is not acknowledgement.</p>
+          {consentForms.length===0 ? <p className="text-sm text-slate-500">No active consent forms available.</p> : (
+            <div className="space-y-3">
+              <select value={consentSelectedId} onChange={e=>setConsentSelectedId(e.target.value)} className="w-full rounded-lg border bg-white px-3 py-2 text-sm">
+                <option value="">Select consent form</option>
+                {consentForms.map(f=> <option key={f.id} value={f.id}>{f.title}</option>)}
+              </select>
+              {consentSelectedId && (()=>{ const f=consentForms.find(x=>x.id===consentSelectedId); return f ? <div className="rounded border bg-white p-3"><p className="font-medium text-sm">{f.title}</p><a href={f.file_path} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex items-center gap-1 rounded bg-teal-600 px-3 py-1.5 text-xs font-medium text-white">Open Consent Form</a></div> : null })()}
+              <input value={consentPatientName} onChange={e=>setConsentPatientName(e.target.value)} placeholder="Patient Name" className="w-full rounded-lg border px-3 py-2 text-sm" />
+              <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={consentAcknowledged} onChange={e=>setConsentAcknowledged(e.target.checked)} className="h-4 w-4 rounded border-slate-300 text-teal-600" /> I acknowledge and consent to the above treatment/procedure.</label>
+              {consentError && <p className="text-xs text-rose-600">{consentError}</p>}
+              <button type="button" onClick={()=>{
+                if(!consentSelectedId) return setConsentError('Select a consent form');
+                if(!consentPatientName.trim()) return setConsentError('Patient name required');
+                if(!consentAcknowledged) return setConsentError('Please tick acknowledgement');
+                const f=consentForms.find(x=>x.id===consentSelectedId);
+                setPendingConsents(prev=> [...prev, {consent_form_id:consentSelectedId, patient_name:consentPatientName.trim(), title:f?.title||''}]);
+                setConsentSelectedId(''); setConsentAcknowledged(false); setConsentError('');
+              }} className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white">Add Consent Acknowledgement</button>
+              {pendingConsents.length>0 && <div className="space-y-2"><p className="text-xs font-semibold uppercase text-slate-500">Pending ({pendingConsents.length})</p>{pendingConsents.map((pc,i)=> <div key={i} className="flex justify-between rounded border bg-slate-50 px-3 py-2 text-sm"><span>{pc.title} — {pc.patient_name}</span><button type="button" onClick={()=>setPendingConsents(prev=>prev.filter((_,idx)=>idx!==i))} className="text-xs text-rose-600">Remove</button></div>)}</div>}
+            </div>
+          )}
         </Section>
 
         <Section title="Doctors Involved">

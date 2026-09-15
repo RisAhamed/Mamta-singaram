@@ -14,6 +14,7 @@ import PrescriptionPad from './pages/PrescriptionPad'
 import Appointments from './pages/Appointments'
 import Labs from './pages/Labs'
 import LabDetail from './pages/LabDetail'
+import ConsentForms from './pages/ConsentForms'
 
 function App() {
   return (
@@ -29,6 +30,7 @@ function App() {
             <Route path="/appointments" element={<Appointments />} />
             <Route path="/labs" element={<Labs />} />
             <Route path="/labs/:labId" element={<LabDetail />} />
+            <Route path="/consent-forms" element={<ConsentForms />} />
             <Route path="/doctors" element={<Doctors />} />
             <Route path="/payments" element={<Payments />} />
             <Route path="/search" element={<Search />} />

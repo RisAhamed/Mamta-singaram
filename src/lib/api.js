@@ -207,6 +207,20 @@ export function getPaymentSessions(filters = {}) {
   return request(`/api/payments/sessions${qs}`)
 }
 
+// Consent Forms
+export function getConsentForms(isActive) {
+  if (isActive === true) return request('/api/consent-forms?is_active=true')
+  if (isActive === false) return request('/api/consent-forms?is_active=false')
+  return request('/api/consent-forms')
+}
+export function getConsentForm(id) { return request(`/api/consent-forms/${id}`) }
+export function createConsentForm(data) { return request('/api/consent-forms', { method: 'POST', body: JSON.stringify(data) }) }
+export function updateConsentForm(id, data) { return request(`/api/consent-forms/${id}`, { method: 'PUT', body: JSON.stringify(data) }) }
+export function deleteConsentForm(id) { return request(`/api/consent-forms/${id}`, { method: 'DELETE' }) }
+export function getSessionConsentForms(sessionId) { return request(`/api/sessions/${sessionId}/consent-forms`) }
+export function acknowledgeConsentForm(sessionId, data) { return request(`/api/sessions/${sessionId}/consent-forms`, { method: 'POST', body: JSON.stringify(data) }) }
+export function deleteSessionConsentForm(sessionId, id) { return request(`/api/sessions/${sessionId}/consent-forms/${id}`, { method: 'DELETE' }) }
+
 // Lab Management Portal
 export function getLabSummary() { return request('/api/labs/summary') }
 export function getLabDetail(labId, filters = {}) {

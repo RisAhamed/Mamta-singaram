@@ -25,6 +25,8 @@ import patientLabEntriesRouter from './routes/patientLabEntries.js'
 import sessionSurgeryFormsRouter from './routes/sessionSurgeryForms.js'
 import labsRouter from './routes/labs.js'
 import paymentAnalyticsRouter from './routes/paymentAnalytics.js'
+import consentFormsRouter from './routes/consentForms.js'
+import sessionConsentFormsRouter from './routes/sessionConsentForms.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -71,6 +73,7 @@ app.get('/api/health', async (req, res) => {
 })
 
 // Mount routers - nested session sub-resources first to avoid /:id collision
+app.use('/api/consent-forms', consentFormsRouter)
 app.use('/api/payments', paymentAnalyticsRouter)
 app.use('/api/labs', labsRouter)
 app.use('/api/locations', locationsRouter)
@@ -83,6 +86,7 @@ app.use('/api/patients/:patientId/lab-entries', patientLabEntriesRouter)
 app.use('/api/sessions/:sessionId/surgery-notes', surgeryNotesRouter)
 app.use('/api/sessions/:sessionId/lab-entries', labEntriesRouter)
 app.use('/api/sessions/:sessionId/surgery-forms', sessionSurgeryFormsRouter)
+app.use('/api/sessions/:sessionId/consent-forms', sessionConsentFormsRouter)
 app.use('/api/patients', patientsRouter)
 app.use('/api/doctors', doctorsRouter)
 app.use('/api/sessions/:sessionId/doctors', sessionDoctorsRouter)
