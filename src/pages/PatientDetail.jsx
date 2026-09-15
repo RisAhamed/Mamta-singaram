@@ -28,6 +28,7 @@ import {
   updateAppointment,
   deleteAppointment,
   getPatientLedger,
+  createLedgerEntry,
   deleteLedgerEntry,
   getPatientLabEntries,
 } from '../lib/api'
@@ -68,6 +69,8 @@ function PatientDetail() {
   const [showAddLab, setShowAddLab] = useState(false)
   const [apptForm, setApptForm] = useState({ appointment_date:'', appointment_time:'', title:'', notes:'', location_id:'' })
   const [labForm, setLabForm] = useState({ session_id:'', lab_vendor_id:'', test_name:'', cost:'', amount_paid:'', entry_date:'', required_date:'', status:'Ordered', notes:'' })
+  const [showAddLedger, setShowAddLedger] = useState(false)
+  const [ledgerForm, setLedgerForm] = useState({ amount:'', entry_type:'payment', description:'', entry_date:'', session_id:'' })
   const [showReport, setShowReport] = useState(false)
 
   useEffect(() => {
@@ -597,6 +600,7 @@ function PatientDetail() {
             <div className="flex items-center gap-3">
               <h2 className="text-2xl font-semibold tracking-normal text-slate-950">Financial Ledger</h2>
               <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200">{ledgerEntries.length} entries</span>
+              <button type="button" onClick={()=>setShowAddLedger(true)} className="ml-2 rounded-lg bg-teal-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-teal-700">+ Add Finance Details</button>
             </div>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               <div className="inline-flex w-full overflow-x-auto rounded-lg border border-slate-200 bg-white p-1 shadow-sm sm:w-fit">
@@ -786,6 +790,19 @@ function PatientDetail() {
             <select value={labForm.status} onChange={e=>setLabForm({...labForm, status:e.target.value})} className="w-full rounded border px-3 py-2 text-sm"><option>Ordered</option><option>Received</option><option>Cancelled</option></select>
             <textarea value={labForm.notes} onChange={e=>setLabForm({...labForm, notes:e.target.value})} rows={2} placeholder="Notes" className="w-full rounded border px-3 py-2 text-sm" />
             <div className="flex justify-end gap-2"><button type="button" onClick={()=>setShowAddLab(false)} className="rounded border px-4 py-2 text-sm">Cancel</button><button type="submit" className="rounded bg-teal-600 px-4 py-2 text-sm font-medium text-white">Create</button></div>
+          </form>
+        </div>
+      )}
+      {showAddLedger && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={()=>setShowAddLedger(false)}>
+          <form onClick={e=>e.stopPropagation()} onSubmit={async (e)=>{e.preventDefault(); if(!ledgerForm.amount|| isNaN(Number(ledgerForm.amount)) || Number(ledgerForm.amount)<=0) return showToast('Amount required','warning'); try{ await createLedgerEntry(patientId, {amount: Number(ledgerForm.amount), entry_type: ledgerForm.entry_type, description: ledgerForm.description.trim()||null, entry_date: ledgerForm.entry_date||null, session_id: ledgerForm.session_id||null}); showToast('Ledger entry added','success'); setShowAddLedger(false); setLedgerForm({amount:'',entry_type:'payment',description:'',entry_date:'',session_id:''}); const data=await getPatientLedger(patientId); setLedgerEntries(Array.isArray(data)?data:data?.data??[])}catch(err){showToast(err.message,'error')}}} className="w-full max-w-md rounded-xl bg-white p-6 shadow-2xl space-y-3">
+            <h3 className="font-semibold">Add Finance Details — {patient.full_name}</h3>
+            <input type="number" min="0" step="0.01" value={ledgerForm.amount} onChange={e=>setLedgerForm({...ledgerForm, amount:e.target.value})} placeholder="Amount (₹) *" className="w-full rounded border px-3 py-2 text-sm" required />
+            <select value={ledgerForm.entry_type} onChange={e=>setLedgerForm({...ledgerForm, entry_type:e.target.value})} className="w-full rounded border px-3 py-2 text-sm"><option value="payment">Payment (money received)</option><option value="charge">Charge</option><option value="adjustment">Adjustment</option><option value="lab_fee">Lab Fee</option></select>
+            <input type="date" value={ledgerForm.entry_date} onChange={e=>setLedgerForm({...ledgerForm, entry_date:e.target.value})} className="w-full rounded border px-3 py-2 text-sm" />
+            <select value={ledgerForm.session_id} onChange={e=>setLedgerForm({...ledgerForm, session_id:e.target.value})} className="w-full rounded border px-3 py-2 text-sm"><option value="">No related session (optional)</option>{sessions.map(s=> <option key={s.id} value={s.id}>{s.visit_date?.slice(0,10)} — {s.chief_complaint}</option>)}</select>
+            <input value={ledgerForm.description} onChange={e=>setLedgerForm({...ledgerForm, description:e.target.value})} placeholder="Description (e.g. Patient paid ₹100)" className="w-full rounded border px-3 py-2 text-sm" />
+            <div className="flex justify-end gap-2"><button type="button" onClick={()=>setShowAddLedger(false)} className="rounded border px-4 py-2 text-sm">Cancel</button><button type="submit" className="rounded bg-teal-600 px-4 py-2 text-sm font-medium text-white">Save</button></div>
           </form>
         </div>
       )}

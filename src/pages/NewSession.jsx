@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars, no-undef */
 import { useEffect, useRef, useState } from 'react'
 import { format } from 'date-fns'
 import {
@@ -12,7 +13,6 @@ import {
 } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useToast } from '../hooks/useToast'
-import { CONSULTATION_FORMS } from '../lib/consultationForms'
 import MasterSelect from '../components/MasterSelect'
 import FileUpload from '../components/FileUpload'
 import {
@@ -20,7 +20,6 @@ import {
   getDoctors,
   getSessions,
   createSession,
-  createConsultationForm,
   getLocations,
   createLocation,
   getFacialBones,
@@ -28,13 +27,12 @@ import {
   getLabVendors,
   createLabVendor,
   upsertSurgeryNotes,
+  createLabEntry,
   getConsentForms,
   acknowledgeConsentForm,
 } from '../lib/api'
 
-
 const today = format(new Date(), 'yyyy-MM-dd')
-
 
 const initialForm = {
   visit_date: today,
@@ -51,7 +49,6 @@ const initialForm = {
   next_visit_date: '',
 }
 
-
 const initialChartForm = {
   region: 'Upper Jaw',
   tooth_number: '',
@@ -59,14 +56,12 @@ const initialChartForm = {
   notes: '',
 }
 
-
 const visitTypes = [
   { label: 'New Problem', value: 'New' },
   { label: 'Follow-up', value: 'Follow-up' },
   { label: 'Emergency', value: 'Emergency' },
   { label: 'Routine Checkup', value: 'Routine Checkup' },
 ]
-
 
 const regionOptions = [
   'Upper Jaw',
@@ -78,7 +73,6 @@ const regionOptions = [
   'Tongue',
   'Other',
 ]
-
 
 function NewSession() {
   const navigate = useNavigate()
@@ -107,11 +101,6 @@ function NewSession() {
   const [pulseRate, setPulseRate] = useState('')
   const [spo2, setSpo2] = useState('')
 
-  // ── Consultation Forms state ──
-  const [pendingConsultationForms, setPendingConsultationForms] = useState([])
-  const [consultationModalForm, setConsultationModalForm] = useState(null)
-  const [modalHasRead, setModalHasRead] = useState(false)
-
   // ── Consent Forms state (pending for new session) ──
   const [consentForms, setConsentForms] = useState([])
   const [pendingConsents, setPendingConsents] = useState([])
@@ -119,36 +108,13 @@ function NewSession() {
   const [consentPatientName, setConsentPatientName] = useState('')
   const [consentAcknowledged, setConsentAcknowledged] = useState(false)
   const [consentError, setConsentError] = useState('')
+  const [pendingLabOrders, setPendingLabOrders] = useState([])
+  const [labForm, setLabForm] = useState({ lab_vendor_id:'', test_name:'', cost:'', amount_paid:'', entry_date:'', required_date:'', status:'Ordered', notes:'' })
 
   // ── Master-data dropdowns ──
   const [locationId, setLocationId] = useState('')
   const [surgeryNotes, setSurgeryNotes] = useState('')
   const [facialBoneId, setFacialBoneId] = useState('')
-  const [labVendorId, setLabVendorId] = useState('')
-
-  // Modal action handlers (prevent implicit form submit when nested inside the main form)
-  const handleModalCancel = (event) => {
-    if (event && event.preventDefault) event.preventDefault()
-    if (event && event.stopPropagation) event.stopPropagation()
-    setConsultationModalForm(null)
-  }
-
-  const handleConfirmAttach = (event) => {
-    if (event && event.preventDefault) event.preventDefault()
-    if (event && event.stopPropagation) event.stopPropagation()
-
-    if (!modalHasRead) return
-
-    setPendingConsultationForms((prev) => [
-      ...prev,
-      {
-        formId: consultationModalForm.id,
-        formLabel: consultationModalForm.label,
-      },
-    ])
-    setConsultationModalForm(null)
-  }
-
 
   useEffect(() => {
     const cost = Number.parseFloat(formData.treatment_cost) || 0
@@ -166,7 +132,6 @@ function NewSession() {
     const timer = window.setTimeout(() => setPaymentStatus(nextStatus), 0)
     return () => window.clearTimeout(timer)
   }, [formData.amount_paid, formData.treatment_cost])
-
 
   useEffect(() => {
     getConsentForms(true).then(d=> setConsentForms(Array.isArray(d)?d: d?.data ?? [])).catch(()=>{})
@@ -211,7 +176,6 @@ function NewSession() {
     Promise.resolve().then(loadPatient)
   }, [patientId, showToast])
 
-
   useEffect(() => {
     const loadDoctors = async () => {
       try {
@@ -226,7 +190,6 @@ function NewSession() {
 
     Promise.resolve().then(loadDoctors)
   }, [showToast])
-
 
   useEffect(() => {
     const loadPreviousSessions = async () => {
@@ -248,11 +211,9 @@ function NewSession() {
     Promise.resolve().then(loadPreviousSessions)
   }, [patientId, showToast])
 
-
   useEffect(() => {
     chartEntriesRef.current = chartEntries
   }, [chartEntries])
-
 
   const handleFormChange = (event) => {
     const { name, type, checked, value } = event.target
@@ -264,12 +225,10 @@ function NewSession() {
     }))
   }
 
-
   const handleChartDraftChange = (event) => {
     const { name, value } = event.target
     setChartForm((current) => ({ ...current, [name]: value }))
   }
-
 
   const addChartEntry = () => {
     if (!chartForm.procedure_done.trim()) {
@@ -293,7 +252,6 @@ function NewSession() {
     setChartForm(initialChartForm)
   }
 
-
   const removeChartEntry = (tempId) => {
     setChartEntries((current) => {
       const updated = current.filter((entry) => entry.tempId !== tempId)
@@ -302,7 +260,6 @@ function NewSession() {
     })
   }
 
-
   const toggleDoctor = (doctorId) => {
     setSelectedDoctorIds((current) =>
       current.includes(doctorId)
@@ -310,8 +267,6 @@ function NewSession() {
         : [...current, doctorId],
     )
   }
-
-
 
   const handleSave = async (event) => {
     event.preventDefault()
@@ -420,64 +375,6 @@ function NewSession() {
         }
       }
 
-      // Save consultation form acknowledgements if any are attached
-      if (pendingConsultationForms.length > 0) {
-        try {
-          let formsToUpload = [...pendingConsultationForms]
-          const MAX_SYNC_ATTEMPTS = 3
-
-          for (let syncAttempt = 1; syncAttempt <= MAX_SYNC_ATTEMPTS; syncAttempt += 1) {
-            const results = await Promise.allSettled(
-              formsToUpload.map(async (item) => {
-                await createConsultationForm(targetSessionId, {
-                  form_type: item.formId,
-                  form_label: item.formLabel,
-                  acknowledged: true,
-                })
-              }),
-            )
-
-            const failedForms = []
-            const succeededForms = []
-
-            results.forEach((result, index) => {
-              if (result.status === 'fulfilled') {
-                succeededForms.push(formsToUpload[index])
-              } else {
-                failedForms.push(formsToUpload[index])
-              }
-            })
-
-            formsToUpload = failedForms
-
-            if (formsToUpload.length === 0) {
-              setPendingConsultationForms([])
-              break
-            }
-
-            if (syncAttempt < MAX_SYNC_ATTEMPTS) {
-              await new Promise((resolve) => setTimeout(resolve, 400 * syncAttempt))
-            }
-          }
-
-          if (formsToUpload.length > 0) {
-            setPendingConsultationForms(formsToUpload)
-            showToast(
-              'Unable to sync some consultation acknowledgements to backend. Please check network and click Save Session once more.',
-              'warning',
-            )
-            return
-          }
-        } catch (cfErr) {
-          console.error('Consultation form upload error:', cfErr)
-          showToast(
-            'Consultation form sync failed unexpectedly. Please click Save Session once more.',
-            'warning',
-          )
-          return
-        }
-      }
-
       // Save pending consent acknowledgements
       if (pendingConsents.length > 0) {
         try {
@@ -486,6 +383,14 @@ function NewSession() {
           }
           setPendingConsents([])
         } catch (e) { console.error('consent save failed', e); showToast(e.message, 'warning') }
+      }
+      if (pendingLabOrders.length > 0) {
+        try {
+          for (const lo of pendingLabOrders) {
+            await createLabEntry(targetSessionId, { test_name: lo.test_name, lab_vendor_id: lo.lab_vendor_id||null, cost: lo.cost, amount_paid: lo.amount_paid, entry_date: lo.entry_date||null, required_date: lo.required_date||null, status: lo.status, notes: lo.notes||null })
+          }
+          setPendingLabOrders([])
+        } catch (e) { console.error('lab save failed', e); showToast(e.message,'warning') }
       }
 
       showToast('Session saved successfully.', 'success')
@@ -497,7 +402,6 @@ function NewSession() {
       setSaving(false)
     }
   }
-
 
   if (loading) {
     return (
@@ -515,7 +419,6 @@ function NewSession() {
       </div>
     )
   }
-
 
   return (
     // ─── FIX: single-scroll wrapper ──────────────────────────────────────────
@@ -839,151 +742,6 @@ function NewSession() {
           )}
         </Section>
 
-        {/* ── Consultation Forms — data-driven, future-ready (backend preserved, content temporarily unavailable) ── */}
-        <Section title="Consultation Forms">
-          {CONSULTATION_FORMS.length === 0 ? (
-            <p className="text-sm text-slate-500">
-              No consultation forms currently configured. Historical consultation records for this patient remain accessible. A new form can be added later without restructuring — it will automatically appear here and open in a new tab.
-            </p>
-          ) : (
-            <>
-              <p className="mb-4 text-sm text-slate-600">
-                Select consultation forms acknowledged by the patient. Each form opens in a new tab to keep this session page open.
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {CONSULTATION_FORMS.map((form) => {
-                  const isAttached = pendingConsultationForms.some((p) => p.formId === form.id)
-                  return (
-                    <button
-                      key={form.id}
-                      type="button"
-                      onClick={() => {
-                        if (isAttached) return
-                        setConsultationModalForm(form)
-                        setModalHasRead(false)
-                      }}
-                      className={`inline-flex items-center gap-1.5 rounded-full px-3 py-2.5 text-sm font-medium ring-1 transition focus:outline-none focus:ring-2 focus:ring-teal-500 ${
-                        isAttached
-                          ? 'bg-teal-600 text-white ring-teal-600'
-                          : 'bg-slate-100 text-slate-700 ring-slate-200 hover:bg-slate-200'
-                      }`}
-                    >
-                      {isAttached && <Check className="h-3.5 w-3.5" />}
-                      <FileText className="h-3.5 w-3.5" />
-                      {form.label}
-                    </button>
-                  )
-                })}
-              </div>
-            </>
-          )}
-
-          {/* Pending attached consultation forms list */}
-          {pendingConsultationForms.length > 0 && (
-            <div className="mt-4 space-y-2">
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
-                Attached consultation forms ({pendingConsultationForms.length})
-              </p>
-              {pendingConsultationForms.map((item) => (
-                <div
-                  key={item.formId}
-                  className="flex items-center justify-between gap-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <Check className="h-4 w-4 text-teal-600" />
-                    <span className="text-sm font-medium text-slate-700 truncate">
-                      {item.formLabel}
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setPendingConsultationForms((prev) =>
-                        prev.filter((p) => p.formId !== item.formId)
-                      )
-                    }}
-                    className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-rose-600 transition hover:bg-rose-50"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                    Remove
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </Section>
-
-        {/* ── Consultation Form Modal ────────────────────────────── */}
-        {consultationModalForm && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-            <div className="relative w-full max-w-4xl max-h-[95vh] overflow-y-auto rounded-xl bg-white shadow-2xl">
-              {/* Modal header */}
-              <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4 rounded-t-xl">
-                <h3 className="text-lg font-semibold text-slate-900">
-                  {consultationModalForm.label}
-                </h3>
-                <button
-                  type="button"
-                  onClick={() => setConsultationModalForm(null)}
-                  className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition"
-                >
-                  <X className="h-5 w-5" />
-                </button>
-              </div>
-
-              {/* Modal body */}
-              <div className="p-6 space-y-5">
-                <div className="flex justify-end">
-                  <a
-                    href={consultationModalForm.file}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 text-sm font-medium text-teal-700 hover:text-teal-800"
-                  >
-                    <FileText className="h-4 w-4" /> Open in new tab
-                  </a>
-                </div>
-                <iframe
-                  src={consultationModalForm.file}
-                  style={{ width: '100%', height: '70vh', border: 'none' }}
-                  title={consultationModalForm.label}
-                />
-
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={modalHasRead}
-                    onChange={(e) => setModalHasRead(e.target.checked)}
-                    className="h-4 w-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500"
-                  />
-                  <span className="text-sm font-medium text-slate-700">
-                    I confirm the patient has read and acknowledged this consultation form
-                  </span>
-                </label>
-              </div>
-
-              {/* Modal footer */}
-              <div className="sticky bottom-0 flex items-center justify-end gap-3 border-t border-slate-200 bg-white px-6 py-4 rounded-b-xl">
-                <button
-                  type="button"
-                  onClick={handleModalCancel}
-                  className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  disabled={!modalHasRead}
-                  onClick={handleConfirmAttach}
-                  className="rounded-md bg-teal-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  Confirm Acknowledgement
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
         <Section title="Surgery Notes">
           <p className="mb-4 text-sm text-slate-600">Dedicated surgery notes preserved per session.</p>
           <div className="space-y-4">
@@ -1002,9 +760,40 @@ function NewSession() {
           </div>
         </Section>
 
-        <Section title="Lab / Vendor">
-          <MasterSelect label="Lab / Vendor" value={labVendorId} onChange={setLabVendorId} fetchFn={getLabVendors} createFn={createLabVendor} placeholder="Select lab/vendor" />
-          <p className="mt-2 text-xs text-slate-500">This demonstrates reusable vendor dropdown; historical references preserved, inactive hidden.</p>
+        <Section title="Lab Orders">
+          <p className="mb-3 text-sm text-slate-600">Add lab orders for this session. Each order is independent.</p>
+          {pendingLabOrders.length>0 && (
+            <div className="mb-3 space-y-2">
+              <p className="text-xs font-semibold uppercase text-slate-500">Pending lab orders ({pendingLabOrders.length})</p>
+              {pendingLabOrders.map((o,i)=>(
+                <div key={i} className="flex items-center justify-between rounded border bg-slate-50 px-3 py-2 text-sm">
+                  <span>{o.lab_vendor_name||'No lab'} - {o.test_name} - ₹{o.cost} (Paid ₹{o.amount_paid}, Owed ₹{Math.max(o.cost - o.amount_paid,0)}) - {o.status}</span>
+                  <button type="button" onClick={()=> setPendingLabOrders(prev=> prev.filter((_,idx)=> idx!==i))} className="text-xs text-rose-600">Remove</button>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div><label className="text-xs font-medium text-slate-600">Lab / Vendor</label><MasterSelect label="" value={labForm.lab_vendor_id} onChange={v=> setLabForm({...labForm, lab_vendor_id:v})} fetchFn={getLabVendors} createFn={createLabVendor} placeholder="Select lab/vendor" /></div>
+            <div><label className="text-xs font-medium text-slate-600">Product / Lab Work *</label><input value={labForm.test_name} onChange={e=> setLabForm({...labForm, test_name:e.target.value})} placeholder="e.g. Crown, Bridge" className="w-full rounded border px-3 py-2 text-sm" /></div>
+            <div><label className="text-xs font-medium text-slate-600">Order Date</label><input type="date" value={labForm.entry_date} onChange={e=> setLabForm({...labForm, entry_date:e.target.value})} className="w-full rounded border px-3 py-2 text-sm" /></div>
+            <div><label className="text-xs font-medium text-slate-600">Required Date</label><input type="date" value={labForm.required_date} onChange={e=> setLabForm({...labForm, required_date:e.target.value})} className="w-full rounded border px-3 py-2 text-sm" /></div>
+            <div><label className="text-xs font-medium text-slate-600">Total Cost (₹) *</label><input type="number" min="0" step="0.01" value={labForm.cost} onChange={e=> setLabForm({...labForm, cost:e.target.value})} placeholder="0.00" className="w-full rounded border px-3 py-2 text-sm" /></div>
+            <div><label className="text-xs font-medium text-slate-600">Amount Paid (₹)</label><input type="number" min="0" step="0.01" value={labForm.amount_paid} onChange={e=> setLabForm({...labForm, amount_paid:e.target.value})} placeholder="0.00" className="w-full rounded border px-3 py-2 text-sm" /><p className="mt-1 text-xs text-slate-500">Outstanding: ₹{labForm.cost!=='' ? Math.max((Number(labForm.cost)||0)-(Number(labForm.amount_paid||0)),0).toFixed(2) : '0.00'}</p></div>
+            <div><label className="text-xs font-medium text-slate-600">Status</label><select value={labForm.status} onChange={e=> setLabForm({...labForm, status:e.target.value})} className="w-full rounded border px-3 py-2 text-sm"><option>Ordered</option><option>Received</option><option>Cancelled</option></select></div>
+            <div className="sm:col-span-2"><label className="text-xs font-medium text-slate-600">Notes</label><textarea value={labForm.notes} onChange={e=> setLabForm({...labForm, notes:e.target.value})} rows={2} placeholder="Optional notes" className="w-full rounded border px-3 py-2 text-sm" /></div>
+          </div>
+          <button type="button" onClick={()=>{
+            if(!labForm.test_name.trim()) return showToast('Product is required','warning');
+            if(labForm.cost===''|| isNaN(Number(labForm.cost))|| Number(labForm.cost)<0) return showToast('Cost invalid','warning');
+            if(labForm.amount_paid!=='' && (isNaN(Number(labForm.amount_paid))|| Number(labForm.amount_paid)<0)) return showToast('Amount paid invalid','warning');
+            if(Number(labForm.amount_paid||0) > Number(labForm.cost||0)) return showToast('Paid cannot exceed cost','warning');
+            if(labForm.required_date && labForm.entry_date && new Date(labForm.required_date) < new Date(labForm.entry_date)) return showToast('Required cannot be before order','warning');
+            let vendorName=null;
+            // will resolve on save via lookup, store entered vendor id
+            setPendingLabOrders(prev=> [...prev, { ...labForm, test_name: labForm.test_name.trim(), cost: Number(labForm.cost||0), amount_paid: Number(labForm.amount_paid||0), notes: labForm.notes.trim() }]);
+            setLabForm({ lab_vendor_id:'', test_name:'', cost:'', amount_paid:'', entry_date:'', required_date:'', status:'Ordered', notes:'' });
+          }} className="mt-3 rounded bg-teal-600 px-4 py-2 text-sm text-white">+ Add Lab Order</button>
         </Section>
 
         <Section title="Consent Forms">
@@ -1170,7 +959,6 @@ function NewSession() {
   )
 }
 
-
 function Section({ title, children }) {
   return (
     <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
@@ -1181,7 +969,6 @@ function Section({ title, children }) {
     </section>
   )
 }
-
 
 function Field({ label, name, required = false, className = '', children }) {
   return (
@@ -1194,7 +981,6 @@ function Field({ label, name, required = false, className = '', children }) {
   )
 }
 
-
 function ReadOnlyField({ label, value }) {
   return (
     <div>
@@ -1205,7 +991,6 @@ function ReadOnlyField({ label, value }) {
     </div>
   )
 }
-
 
 function CurrencyField({ label, name, value, onChange }) {
   return (
@@ -1230,14 +1015,11 @@ function CurrencyField({ label, name, value, onChange }) {
   )
 }
 
-
 const inputClassName =
   'mt-1 block w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-950 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20'
 
-
 const textareaClassName =
   'mt-1 block w-full resize-y rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-950 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20'
-
 
 function formatDate(dateValue) {
   if (!dateValue) return '-'
@@ -1246,7 +1028,6 @@ function formatDate(dateValue) {
   return format(d, 'dd MMM yyyy')
 }
 
-
 function toDate(dateValue) {
   if (!dateValue) return null
   if (dateValue?.toDate) return dateValue.toDate()
@@ -1254,18 +1035,15 @@ function toDate(dateValue) {
   return isNaN(d.getTime()) ? null : d
 }
 
-
 function toMillis(dateValue) {
   const d = toDate(dateValue)
   return d ? d.getTime() : -Infinity
 }
-
 
 function paymentStatusClassName(status) {
   if (status === 'Paid') return 'bg-green-100 text-green-700'
   if (status === 'Partial') return 'bg-yellow-100 text-yellow-700'
   return 'bg-red-100 text-red-600'
 }
-
 
 export default NewSession
