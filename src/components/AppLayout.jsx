@@ -13,7 +13,6 @@ import {
 } from 'lucide-react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { CLINIC_NAME, CLINIC_SUBTITLE } from '../lib/config'
-import { CONSULTATION_FORMS } from '../lib/consultationForms'
 
 const navigationItems = [
   { label: 'Dashboard', path: '/', icon: LayoutDashboard, aliases: ['/dashboard'] },
@@ -68,7 +67,6 @@ function AppLayout() {
           onNavigate={closeMobileSidebar}
           onToggle={() => setSidebarOpen((current) => !current)}
           currentPath={location.pathname}
-          consultationForms={CONSULTATION_FORMS}
         />
       </aside>
 
@@ -106,7 +104,6 @@ function AppLayout() {
             onNavigate={closeMobileSidebar}
             expanded
             currentPath={location.pathname}
-            consultationForms={CONSULTATION_FORMS}
           />
         </aside>
       </div>
@@ -153,7 +150,7 @@ function AppLayout() {
   )
 }
 
-function SidebarContent({ expanded, onNavigate, onToggle, currentPath, consultationForms }) {
+function SidebarContent({ expanded, onNavigate, onToggle, currentPath }) {
   const ToggleIcon = expanded ? PanelLeftClose : PanelLeftOpen
 
   return (
@@ -179,7 +176,6 @@ function SidebarContent({ expanded, onNavigate, onToggle, currentPath, consultat
         onNavigate={onNavigate}
         expanded={expanded}
         currentPath={currentPath}
-        consultationForms={consultationForms}
       />
     </>
   )
@@ -217,7 +213,7 @@ function Logo({ expanded = false }) {
   )
 }
 
-function SidebarNav({ onNavigate, expanded = false, currentPath = '', consultationForms = [] }) {
+function SidebarNav({ onNavigate, expanded = false, currentPath = '' }) {
   return (
       <nav className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain px-2 py-4 [touch-action:pan-y]">
       <div className="space-y-1">
@@ -252,39 +248,6 @@ function SidebarNav({ onNavigate, expanded = false, currentPath = '', consultati
             </NavLink>
           )
         })}
-      </div>
-
-      <div className="mt-4 border-t border-white/5 pt-4">
-        <div className={`mb-2 px-2 text-xs font-semibold uppercase text-slate-400 ${expanded ? 'block' : 'hidden'}`}>
-          Consultation forms
-        </div>
-        <div className="space-y-1 px-1">
-          {consultationForms.length === 0 ? (
-            <p className={`px-3 py-2 text-xs text-slate-500 ${expanded ? 'block' : 'hidden'}`}>
-              No consultation forms currently configured.
-            </p>
-          ) : (
-            consultationForms.map((form) => (
-              <a
-                key={form.file}
-                href={form.file}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={() => onNavigate()}
-                aria-label={form.label}
-                className={`group relative flex w-full items-center rounded-md px-3 py-2 text-sm font-medium transition ${expanded ? 'justify-start gap-3' : 'justify-center'} text-slate-300 hover:bg-white/10 hover:text-white`}
-              >
-                <FileText className="h-5 w-5 shrink-0" />
-                <span className={expanded ? 'inline' : 'hidden'}>{form.label}</span>
-                {!expanded && (
-                  <span className="pointer-events-none absolute left-full top-1/2 z-50 ml-3 hidden -translate-y-1/2 whitespace-nowrap rounded-md bg-slate-900 px-2.5 py-1.5 text-xs font-medium text-white opacity-0 shadow-lg transition group-hover:opacity-100 md:block">
-                    {form.label}
-                  </span>
-                )}
-              </a>
-            ))
-          )}
-        </div>
       </div>
 
       {prescriptionPads.length > 0 && (
