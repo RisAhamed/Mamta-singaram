@@ -278,10 +278,6 @@ function NewSession() {
       showToast('Chief Complaint is required.', 'warning')
       return
     }
-    if (!formData.next_visit_date || !String(formData.next_visit_date).trim()) {
-      showToast('Next Appointment Date is required.', 'warning')
-      return
-    }
     if (fileUploadRef.current && !fileUploadRef.current.hasPending()) {
       showToast('Upload Photos is required — please add at least one photo/document.', 'warning')
       return
@@ -898,7 +894,7 @@ function NewSession() {
                 placeholder="Optional additional notes"
               />
             </Field>
-            <Field label="Next Appointment Date" name="next_visit_date" required>
+            <Field label="Next Appointment Date" name="next_visit_date">
               <input
                 id="next_visit_date"
                 name="next_visit_date"
@@ -906,7 +902,6 @@ function NewSession() {
                 value={formData.next_visit_date}
                 onChange={handleFormChange}
                 className={inputClassName}
-                required
               />
             </Field>
           </div>

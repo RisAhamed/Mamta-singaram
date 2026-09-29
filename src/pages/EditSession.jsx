@@ -326,10 +326,6 @@ function EditSession() {
       window.alert('Chief complaint is required')
       return
     }
-    if (!nextVisitDate || !String(nextVisitDate).trim()) {
-      showToast('Next Appointment Date is required.', 'warning')
-      return
-    }
     if (sessionFiles.length === 0 && (!fileUploadRef.current || !fileUploadRef.current.hasPending())) {
       showToast('Upload Photos is required — please add at least one photo/document.', 'warning')
       return
